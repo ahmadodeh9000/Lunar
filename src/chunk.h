@@ -9,11 +9,15 @@ typedef enum {
 
     // control flow
     OP_RET,             
-    OP_CONST,           
+    OP_CONST,         
+    
+    // true, false, nil
+    OP_TRUE,OP_FALSE,OP_NIL,
 
     // arithmetic
     OP_NEGATE, OP_ADD, OP_SUB, OP_MUL, OP_DIV,
-    OP_POW, OP_MOD,
+    OP_POW, OP_MOD, OP_NOT, OP_EQU, OP_GREATER,
+    OP_LESS,
 
     // bitwise
     OP_BITWISE_OR, OP_BITWISE_XOR, OP_BITWISE_AND,

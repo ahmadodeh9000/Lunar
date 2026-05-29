@@ -63,6 +63,28 @@ i32 disassemble_instruction(Chunk* chunk, i32 offset) {
         case OP_MOD:
             return simple_instruction("OP_MOD",offset);
 
+        case OP_TRUE:
+            return simple_instruction("OP_TRUE",offset);
+        
+        case OP_FALSE:
+            return simple_instruction("OP_FALSE",offset);
+
+        case OP_NIL:
+            return simple_instruction("OP_NIL",offset);
+
+        case OP_NOT:
+            return simple_instruction("OP_NOT",offset);
+
+
+        case OP_EQU:
+            return simple_instruction("OP_EQU",offset);
+
+        case OP_GREATER:
+            return simple_instruction("OP_GREATER",offset);
+
+        case OP_LESS:
+            return simple_instruction("OP_LESS",offset);
+
         case OP_POW:
             return simple_instruction("OP_POW",offset);
 

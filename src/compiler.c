@@ -156,6 +156,18 @@ static void parsePrecedence(Precedence precedence);
 static void expression();
 static ParseRule* getRule(TokenType type);
 
+static void literal();
+
+static void literal() {
+    switch(parser.prev.type) {
+        case TOKEN_FALSE: emit_byte(OP_FALSE); break;
+        case TOKEN_TRUE: emit_byte(OP_TRUE); break;
+        case TOKEN_NIL: emit_byte(OP_NIL); break;
+
+        default: return;
+    }
+}
+
 static u8 make_const(Value val) {
     i32 constant = add_constant(current_chunk(),val);
 
@@ -199,6 +211,13 @@ static void binary() {
         case TOKEN_BITWISE_LEFT_SHIFT:      emit_byte(OP_BITWISE_LEFTSHIFT); break;
         case TOKEN_BITWISE_RIGHT_SHIFT:     emit_byte(OP_BITWISE_RIGHTSHIFT); break;
 
+        case TOKEN_BANG_EQUAL:    emit_bytes(OP_EQU, OP_NOT); break;
+        case TOKEN_EQUAL_EQUAL:   emit_byte(OP_EQU); break;
+        case TOKEN_GREATER:       emit_byte(OP_GREATER); break;
+        case TOKEN_GREATER_EQUAL: emit_bytes(OP_LESS, OP_NOT); break;
+        case TOKEN_LESS:          emit_byte(OP_LESS); break;
+        case TOKEN_LESS_EQUAL:    emit_bytes(OP_GREATER, OP_NOT); break;
+
         default: return;
     }
 
@@ -212,8 +231,9 @@ static void unary() {
     parsePrecedence(PREC_POWER);  // compile the operand
 
     switch (operatorType) {
-        case TOKEN_MINUS: emit_byte(OP_NEGATE); break;
+        case TOKEN_MINUS:       emit_byte(OP_NEGATE); break;
         case TOKEN_BITWISE_NOT: emit_byte(OP_BITWISE_NOT); break;
+        case TOKEN_BANG:        emit_byte(OP_NOT); break;
         default: return;
     }
 }
@@ -225,9 +245,9 @@ static void emit_const(Value value) {
 }
 
 static void number() {
-    Value val = strtod(parser.prev.start,NULL);
+    double val = strtod(parser.prev.start,NULL);
 
-    emit_const(val);
+    emit_const(NUMBER_VAL(val));
 }
 
 static void emit_byte(u8 byte) {
@@ -279,28 +299,29 @@ ParseRule rules[] = {
   [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
   [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
   [TOKEN_STAR_STAR]     = {NULL,     binary, PREC_POWER},
-  [TOKEN_BANG]          = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_BANG_EQUAL]    = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_BANG]          = {unary,     NULL,   PREC_NONE},
+  [TOKEN_BANG_EQUAL]    = {NULL,     binary,   PREC_EQUALITY},
   [TOKEN_EQUAL]         = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_EQUAL_EQUAL]   = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_GREATER]       = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_GREATER_EQUAL] = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_LESS]          = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_LESS_EQUAL]    = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_EQUAL_EQUAL]   = {NULL,     binary,   PREC_EQUALITY},
+  [TOKEN_GREATER]       = {NULL,     binary,   PREC_COMPARISON},
+  [TOKEN_GREATER_EQUAL] = {NULL,     binary,   PREC_COMPARISON},
+  [TOKEN_LESS]          = {NULL,     binary,   PREC_COMPARISON},
+  [TOKEN_LESS_EQUAL]    = {NULL,     binary,   PREC_COMPARISON},
   [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
   [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
   [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_FALSE]         = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_FALSE]         = {literal,     NULL,   PREC_NONE},
   [TOKEN_FOR]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_FN]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_IF]            = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_NIL]           = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_NIL]           = {literal,     NULL,   PREC_NONE},
   [TOKEN_OR]            = {NULL,     NULL,   PREC_NONE},
   [TOKEN_PRINT]         = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_STRUCT]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_RET]            = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_TRUE]          = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_TRUE]          = {literal,     NULL,   PREC_NONE},
   [TOKEN_LET]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_WHILE]         = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ERROR]         = {NULL,     NULL,   PREC_NONE},

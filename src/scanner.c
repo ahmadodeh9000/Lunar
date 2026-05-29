@@ -60,6 +60,7 @@ static TokenType identifier_type() {
         case 'r': return checkKeyword(1,2,"et",TOKEN_RET);
         case 'n': return checkKeyword(1,2,"il",TOKEN_NIL);
         case 't': return checkKeyword(1,3,"rue",TOKEN_TRUE);
+        case 's': return checkKeyword(1,5,"truct",TOKEN_STRUCT);
 
         case 'f': {
             if (scanner.curr - scanner.start > 1) {
