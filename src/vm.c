@@ -33,9 +33,20 @@ void free_lunar_vm() {
 }
 
 InterpretResult interpret(const char* src) {
+    Chunk chunk;
+    init_chunk(&chunk);
 
-    compiler(src);
-    return INTERPRET_OK;
+    if (!compile(src,&chunk)) {
+        free_chunk(&chunk);
+        return INTERPRET_COMPPILE_ERR;
+    }
+
+    lvm.chunk   = &chunk;
+    lvm.ip      = lvm.chunk->code;
+
+    InterpretResult result = run();
+    free_chunk(&chunk);
+    return result;
 
 }
 

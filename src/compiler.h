@@ -1,6 +1,8 @@
 #ifndef lunar_compiler_h
 #define lunar_compiler_h
 
-void compiler(const char* src);
+#include "chunk.h"
+
+bool compile(const char* src, Chunk* chunk);
 
 #endif
