@@ -219,6 +219,7 @@ static void binary() {
         case TOKEN_BITWISE_XOR:             emit_byte(OP_BITWISE_XOR); break;
         case TOKEN_BITWISE_LEFT_SHIFT:      emit_byte(OP_BITWISE_LEFTSHIFT); break;
         case TOKEN_BITWISE_RIGHT_SHIFT:     emit_byte(OP_BITWISE_RIGHTSHIFT); break;
+        case TOKEN_PERCENT:                 emit_byte(OP_MOD); break;
 
         case TOKEN_BANG_EQUAL:    emit_bytes(OP_EQU, OP_NOT); break;
         case TOKEN_EQUAL_EQUAL:   emit_byte(OP_EQU); break;
@@ -306,6 +307,7 @@ ParseRule rules[] = {
   [TOKEN_PLUS]          = {NULL,     binary, PREC_TERM},
   [TOKEN_SEMICOLON]     = {NULL,     NULL,   PREC_NONE},
   [TOKEN_SLASH]         = {NULL,     binary, PREC_FACTOR},
+  [TOKEN_PERCENT]         = {NULL,     binary, PREC_FACTOR},
   [TOKEN_STAR]          = {NULL,     binary, PREC_FACTOR},
   [TOKEN_STAR_STAR]     = {NULL,     binary, PREC_POWER},
   [TOKEN_BANG]          = {unary,     NULL,   PREC_NONE},

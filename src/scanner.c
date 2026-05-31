@@ -233,6 +233,7 @@ Token scan_token() {
         case '.': return make_token(TOKEN_DOT);
         case '-': return make_token(TOKEN_MINUS);
         case '/': return make_token(TOKEN_SLASH);
+        case '%': return make_token(TOKEN_PERCENT);
         case '"': return string();
 
         case '!': {

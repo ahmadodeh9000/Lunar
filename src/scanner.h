@@ -12,6 +12,7 @@ typedef enum {
     TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
     TOKEN_BITWISE_NOT,TOKEN_BITWISE_OR,
     TOKEN_BITWISE_XOR,TOKEN_BITWISE_AND,
+    TOKEN_PERCENT,
 
 
     // One or two character tokens.
