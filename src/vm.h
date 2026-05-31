@@ -11,6 +11,7 @@ typedef struct {
     u8* ip;
     Value stack[STACK_MAX];
     Value* stack_top;
+    Obj* objects;
 } LunarVM;
 
 
@@ -19,6 +20,8 @@ typedef enum {
     INTERPRET_RUNTIME_ERR,
     INTERPRET_COMPPILE_ERR,
 } InterpretResult; 
+
+extern LunarVM lvm;
 
 void init_lunar_vm();
 void free_lunar_vm();

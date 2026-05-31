@@ -1,9 +1,11 @@
 #include "compiler.h"
 #include "scanner.h"
 #include "common.h"
+#include "object.h"
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 #ifdef LUNAR_DEBUG_PRINT_CODE
@@ -157,6 +159,13 @@ static void expression();
 static ParseRule* getRule(TokenType type);
 
 static void literal();
+static void string();
+
+
+static void string() {
+  emit_const(OBJ_VAL(copy_str(parser.prev.start + 1,
+                                  parser.prev.length - 2)));
+}
 
 static void literal() {
     switch(parser.prev.type) {
@@ -308,7 +317,7 @@ ParseRule rules[] = {
   [TOKEN_LESS]          = {NULL,     binary,   PREC_COMPARISON},
   [TOKEN_LESS_EQUAL]    = {NULL,     binary,   PREC_COMPARISON},
   [TOKEN_IDENTIFIER]    = {NULL,     NULL,   PREC_NONE},
-  [TOKEN_STRING]        = {NULL,     NULL,   PREC_NONE},
+  [TOKEN_STRING]        = {string,     NULL,   PREC_NONE},
   [TOKEN_NUMBER]        = {number,   NULL,   PREC_NONE},
   [TOKEN_AND]           = {NULL,     NULL,   PREC_NONE},
   [TOKEN_ELSE]          = {NULL,     NULL,   PREC_NONE},
