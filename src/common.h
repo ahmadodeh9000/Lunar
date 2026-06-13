@@ -1,24 +1,21 @@
-
 #ifndef lunar_common_h
 #define lunar_common_h
 
-
-/* DEBUG CONSTANTS */
-#define LUNAR_DEBUG_TRACE_EXECUTION
-#define LUNAR_DEBUG_PRINT_CODE
+/* DEBUG CONSTANTS — comment these out for release builds */
+//#define LUNAR_DEBUG_TRACE_EXECUTION
+//#define LUNAR_DEBUG_PRINT_CODE
+//#define LUNAR_DEBUG_LOG_GC
+//#define LUNAR_DEBUG_STRESS_GC
 
 /* LUNAR CONSTANTS */
 #define LUNAR_NAME          "Lunar"
 #define LUNAR_VERSION       "0.0.1"
 
-
 /* LUNAR ERROR CODES */
-#define LUNAR_NOT_ENOUGH_MEMORY                 10
+#define LUNAR_NOT_ENOUGH_MEMORY         10
 #define LUNAR_READ_FILE_FAILURE         90
 #define LUNAR_RUNTIME_ERROR_CODE        100
 #define LUNAR_COMPILETIME_ERROR_CODE    110
-
-
 
 /* PRIMARY HEADERS */
 #include <stddef.h>
@@ -35,8 +32,5 @@ typedef int8_t  i8;
 typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
-
-
-
 
 #endif

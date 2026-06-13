@@ -1,110 +1,44 @@
 #include "value.h"
 #include "object.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 void init_value_array(ValueArray* va) {
-
-    /* checks if value array is null or not*/
-    if (NULL == va) {
-        fprintf(stderr,"VALUEARRAY IS NULL !\n");
-        exit(-67);
-    }
-
-    va->capacity    = 0;
-    va->count       = 0;
-    va->values      = NULL;
-
+    va->capacity = 0; va->count = 0; va->values = NULL;
 }
 
 void write_value_array(ValueArray* va, Value v) {
-
-    /* checks if value array is null or not*/
-    if (NULL == va) {
-        fprintf(stderr,"VALUEARRAY IS NULL !\n");
-        exit(-67);
-    }
-
-    /* reallocate value array logic */
     if (va->capacity < va->count + 1) {
-        i32 old_capacity = va->capacity;
-        va->capacity = ((old_capacity < 8) ? 8 : 2 * old_capacity);
-        va->values  = (Value*) realloc(va->values, sizeof(Value) * va->capacity);
-
-        if (NULL == va->values) {
-            fprintf(stderr,"FAILED TO REALLOCATE VALUEARRAY VALUES !!\n");
-            exit(-67);
-        }
-
-
+        i32 old = va->capacity;
+        va->capacity = old < 8 ? 8 : 2 * old;
+        va->values = (Value*)realloc(va->values, sizeof(Value) * va->capacity);
+        if (!va->values) { fprintf(stderr,"OOM\n"); exit(1); }
     }
-
     va->values[va->count++] = v;
-
 }
 
 void free_value_array(ValueArray* va) {
-
-    /* checks if value array is null or not*/
-    if (NULL == va) {
-        fprintf(stderr,"VALUEARRAY IS NULL !\n");
-        exit(-67);
-    }
-
     free(va->values);
     init_value_array(va);
 }
 
 void printValue(Value value) {
-    
-    switch(value.type) {
-
-        case VAL_BOOL:
-            printf(AS_BOOL(value) ? "true" : "false");
-            break;
-        
-        case VAL_NIL:
-            printf("nil");
-            break;
-
-        case VAL_NUM:
-            printf("%g",AS_NUMBER(value));
-            break;
-
-        case VAL_OBJ:
-            printObject(value);
-            break;
-
-
+    switch (value.type) {
+        case VAL_BOOL: printf(AS_BOOL(value) ? "true" : "false"); break;
+        case VAL_NIL:  printf("nil"); break;
+        case VAL_NUM:  printf("%g", AS_NUMBER(value)); break;
+        case VAL_OBJ:  printObject(value); break;
     }
-
 }
 
 bool values_equ(Value a, Value b) {
-
     if (a.type != b.type) return false;
-
-
-    switch(a.type) {
+    switch (a.type) {
         case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
-        case VAL_NIL: return true;
-        case VAL_NUM: return AS_NUMBER(a) == AS_NUMBER(b);
-
-        case VAL_OBJ: {
-            ObjString* a_str = AS_STRING(a);
-            ObjString* b_str = AS_STRING(b);
-
-            return 
-                a_str->length == b_str->length && 
-                memcmp(a_str->chars,b_str->chars,a_str->length) == 0;
-
-
-        }
-
-        default: return false;
+        case VAL_NIL:  return true;
+        case VAL_NUM:  return AS_NUMBER(a) == AS_NUMBER(b);
+        case VAL_OBJ:  return AS_OBJ(a) == AS_OBJ(b); // interned strings → ptr eq
+        default:       return false;
     }
-
-
 }

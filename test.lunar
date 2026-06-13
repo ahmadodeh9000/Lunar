@@ -1,0 +1,86 @@
+// ── variables & print ──
+let x = 10;
+let y = 20;
+print x + y;
+
+// ── strings ──
+let name = "Lunar";
+print "Hello, " + name + "!";
+
+// ── if/else ──
+if (x < y) {
+    print "x is less";
+} else {
+    print "y is less";
+}
+
+// ── while loop ──
+let i = 0;
+while (i < 3) {
+    print i;
+    i = i + 1;
+}
+
+// ── for loop ──
+for (let j = 0; j < 3; j = j + 1) {
+    print j;
+}
+
+// ── functions & closures ──
+fn add(a, b) {
+    ret a + b;
+}
+print add(3, 4);
+
+fn make_counter() {
+    let count = 0;
+    fn inc() {
+        count = count + 1;
+        ret count;
+    }
+    ret inc;
+}
+let counter = make_counter();
+print counter();
+print counter();
+print counter();
+
+// ── structs ──
+struct Point {
+    init(x, y) {
+        self.x = x;
+        self.y = y;
+    }
+    show() {
+        print self.x;
+        print self.y;
+    }
+}
+let p = Point(3, 7);
+p.show();
+
+// ── inheritance ──
+struct Animal {
+    init(name) { self.name = name; }
+    speak() { print self.name; }
+}
+struct Dog < Animal {
+    speak() {
+        print "Woof!";
+        super.speak();
+    }
+}
+let d = Dog("Rex");
+d.speak();
+
+// ── bitwise ──
+print 5 & 3;
+print 5 | 3;
+print 5 ^ 3;
+print 1 << 3;
+
+// ── native functions ──
+print sqrt(16);
+print abs(-42);
+print str(123);
+print len("hello");
