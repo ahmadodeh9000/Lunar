@@ -53,4 +53,6 @@ InterpretResult interpret(const char* src);
 void push(Value val);
 Value pop();
 
+void define_native(const char* name, NativeFn fn);
+
 #endif

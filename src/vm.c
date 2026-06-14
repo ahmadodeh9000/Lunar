@@ -5,6 +5,10 @@
 #include "memory.h"
 #include "table.h"
 
+#ifdef LUNAR_SDL
+#include "lunar_sdl.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -43,7 +47,7 @@ static Value str_native(int argc, Value* args) {
     return OBJ_VAL(copy_str(buf,len));
 }
 
-static void define_native(const char* name, NativeFn fn) {
+void define_native(const char* name, NativeFn fn) {
     push(OBJ_VAL(copy_str(name,(int)strlen(name))));
     push(OBJ_VAL(new_native(fn,name)));
     table_set(&lvm.globals, AS_STRING(lvm.stack[0]), lvm.stack[1]);
@@ -66,6 +70,9 @@ void init_lunar_vm() {
     define_native("ceil",ceil_native);
     define_native("str",str_native);
     define_native("len",len_native);
+#ifdef LUNAR_SDL
+    register_sdl_natives();
+#endif
 }
 
 void free_lunar_vm() {

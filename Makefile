@@ -1,30 +1,37 @@
-CC      = gcc
-CFLAGS  = -std=c11 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
-LIBS    = -lm
-SRC     = $(wildcard src/*.c)
-TARGET  = lunar
+CC     = gcc
+CFLAGS = -std=c11 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
+LIBS   = -lm
 
-# Release build (default)
-all: $(TARGET)
+SRC = src/chunk.c src/compiler.c src/debug.c src/main.c \
+      src/memory.c src/object.c src/scanner.c src/table.c \
+      src/value.c src/vm.c
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) -O2 -o $@ $^ $(LIBS)
+SDL_SRC = $(SRC) src/lunar_sdl.c
 
-# Debug build — enables bytecode tracing + GC logging
-debug: $(SRC)
+TARGET = lunar
+
+all:
+	$(CC) $(CFLAGS) -O2 -o $(TARGET) $(SRC) $(LIBS)
+
+debug:
 	$(CC) $(CFLAGS) -O0 -g \
-	    -DLUNAR_DEBUG_TRACE_EXECUTION \
-	    -DLUNAR_DEBUG_PRINT_CODE \
-	    -o $(TARGET)_debug $^ $(LIBS)
+		-DLUNAR_DEBUG_TRACE_EXECUTION \
+		-DLUNAR_DEBUG_PRINT_CODE \
+		-o $(TARGET)_debug $(SRC) $(LIBS)
 
-# Stress-test GC (collect on every allocation)
-gc-stress: $(SRC)
+gc-stress:
 	$(CC) $(CFLAGS) -O0 -g \
-	    -DLUNAR_DEBUG_STRESS_GC \
-	    -DLUNAR_DEBUG_LOG_GC \
-	    -o $(TARGET)_gcstress $^ $(LIBS)
+		-DLUNAR_DEBUG_STRESS_GC \
+		-DLUNAR_DEBUG_LOG_GC \
+		-o $(TARGET)_gcstress $(SRC) $(LIBS)
+
+sdl:
+	$(CC) $(CFLAGS) -O2 -DLUNAR_SDL \
+		$(shell pkg-config --cflags sdl2) \
+		-o $(TARGET) $(SDL_SRC) \
+		$(shell pkg-config --libs sdl2) $(LIBS)
 
 clean:
 	rm -f $(TARGET) $(TARGET)_debug $(TARGET)_gcstress
 
-.PHONY: all debug gc-stress clean
+.PHONY: all debug gc-stress sdl clean

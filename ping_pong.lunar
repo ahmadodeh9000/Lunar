@@ -1,0 +1,134 @@
+// ═══════════════════════════════
+//  Pong — Lunar + SDL2
+// ═══════════════════════════════
+
+let W = 800;
+let H = 600;
+
+sdl_init("Pong", W, H);
+
+// ── paddle constants ──
+let PAD_W  = 12;
+let PAD_H  = 80;
+let PAD_SPD = 5;
+let MARGIN = 20;
+
+// ── ball constants ──
+let BALL_SIZE = 12;
+
+// ── player paddle (left) ──
+let p1x = MARGIN;
+let p1y = H / 2 - PAD_H / 2;
+
+// ── cpu paddle (right) ──
+let p2x = W - MARGIN - PAD_W;
+let p2y = H / 2 - PAD_H / 2;
+
+// ── ball ──
+let bx  = W / 2;
+let by  = H / 2;
+let bvx = 4;
+let bvy = 3;
+
+// ── scores ──
+let score1 = 0;
+let score2 = 0;
+
+// ── reset ball to center ──
+fn reset_ball() {
+    bx  = W / 2;
+    by  = H / 2;
+    bvx = 4;
+    bvy = 3;
+}
+
+// ── clamp helper ──
+fn clamp(v, lo, hi) {
+    if (v < lo) ret lo;
+    if (v > hi) ret hi;
+    ret v;
+}
+
+let running = true;
+
+while (running) {
+
+    // ── events ──
+    let e = sdl_poll();
+    if (e == "quit" || sdl_key_down("escape")) { running = false; }
+
+    // ── player input ──
+    if (sdl_key_down("up"))   { p1y = p1y - PAD_SPD; }
+    if (sdl_key_down("down")) { p1y = p1y + PAD_SPD; }
+    p1y = clamp(p1y, 0, H - PAD_H);
+
+    // ── cpu ai (tracks ball) ──
+    let p2_center = p2y + PAD_H / 2;
+    if (p2_center < by - 4) { p2y = p2y + 3; }
+    if (p2_center > by + 4) { p2y = p2y - 3; }
+    p2y = clamp(p2y, 0, H - PAD_H);
+
+    // ── move ball ──
+    bx = bx + bvx;
+    by = by + bvy;
+
+    // ── top / bottom bounce ──
+    if (by <= 0) {
+        by  = 0;
+        bvy = -bvy;
+    }
+    if (by + BALL_SIZE >= H) {
+        by  = H - BALL_SIZE;
+        bvy = -bvy;
+    }
+
+    // ── left paddle collision ──
+    if (bx <= p1x + PAD_W && bx >= p1x &&
+        by + BALL_SIZE >= p1y && by <= p1y + PAD_H) {
+        bx  = p1x + PAD_W;
+        bvx = -bvx;
+        let hit = (by + BALL_SIZE / 2) - (p1y + PAD_H / 2);
+        bvy = hit / 8;
+    }
+
+    // ── right paddle collision ──
+    if (bx + BALL_SIZE >= p2x && bx + BALL_SIZE <= p2x + PAD_W &&
+        by + BALL_SIZE >= p2y && by <= p2y + PAD_H) {
+        bx  = p2x - BALL_SIZE;
+        bvx = -bvx;
+        let hit = (by + BALL_SIZE / 2) - (p2y + PAD_H / 2);
+        bvy = hit / 8;
+    }
+
+    // ── scoring ──
+    if (bx < 0) {
+        score2 = score2 + 1;
+        reset_ball();
+    }
+    if (bx > W) {
+        score1 = score1 + 1;
+        reset_ball();
+    }
+
+    // ── draw ──
+    sdl_clear(15, 15, 25);
+
+    // center dashed line
+    let dash = 0;
+    while (dash < H) {
+        sdl_fill_rect(W / 2 - 1, dash, 2, 10, 60, 60, 80, 255);
+        dash = dash + 20;
+    }
+
+    // paddles
+    sdl_fill_rect(p1x, p1y, PAD_W, PAD_H, 80, 200, 255, 255);
+    sdl_fill_rect(p2x, p2y, PAD_W, PAD_H, 255, 100, 100, 255);
+
+    // ball
+    sdl_fill_rect(bx, by, BALL_SIZE, BALL_SIZE, 255, 255, 255, 255);
+
+    sdl_present();
+    sdl_delay(16);
+}
+
+sdl_quit();
