@@ -5,7 +5,7 @@
 let W = 800;
 let H = 600;
 
-sdl_init("Pong", W, H);
+sdl_init("Lunar Ping Pong (made by Ahmad Odeh)", W, H);
 
 // ── paddle constants ──
 let PAD_W  = 12;
@@ -122,10 +122,10 @@ while (running) {
 
     // paddles
     sdl_fill_rect(p1x, p1y, PAD_W, PAD_H, 80, 200, 255, 255);
-    sdl_fill_rect(p2x, p2y, PAD_W, PAD_H, 255, 100, 100, 255);
+    sdl_fill_rect(p2x, p2y, PAD_W, PAD_H, 255, 0, 255, 255);
 
     // ball
-    sdl_fill_rect(bx, by, BALL_SIZE, BALL_SIZE, 255, 255, 255, 255);
+    sdl_fill_rect(bx, by, BALL_SIZE, BALL_SIZE, 255, 0, 0, 255);
 
     sdl_present();
     sdl_delay(16);
