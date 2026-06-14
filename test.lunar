@@ -79,8 +79,24 @@ print 5 | 3;
 print 5 ^ 3;
 print 1 << 3;
 
-// ── native functions ──
+// -- native functions --
 print sqrt(16);
 print abs(-42);
 print str(123);
 print len("hello");
+
+
+// -- fib func --
+
+fn fib(a) {
+    if (a <= 1) {
+        ret 1;
+    }
+
+    ret fib(a - 2) + fib (a - 1); 
+}
+print "fib numbers: ";
+
+for (let i = 0; i < 10; i = i + 1) {
+    print fib(i);
+}
