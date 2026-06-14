@@ -524,20 +524,7 @@ source (.lunar)
 | `src/lunar_sdl.c` | SDL2 native bindings (optional)                     |
 | `src/main.c`      | Entry point — REPL + file runner                    |
 
----
 
-## Roadmap
-
-- [ ] Native array type with `push`, `pop`, `len`
-- [ ] String escape sequences (`\n`, `\t`, `\\`)
-- [ ] `break` and `continue` in loops
-- [ ] Variadic functions
-- [ ] Error handling (`try` / `catch`)
-- [ ] Multiline comments (`/* */`)
-- [ ] More SDL2 — image and text rendering
-- [ ] More built-in math and string functions
-
----
 
 ## License
 
