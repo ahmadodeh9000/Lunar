@@ -9,6 +9,8 @@
 #include "lunar_sdl.h"
 #endif
 
+#include "lunar_std.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -17,6 +19,9 @@
 #include <time.h>
 
 LunarVM lvm;
+
+
+void runtime_error(const char* fmt, ...);
 
 static InterpretResult run();
 static void            reset_stack();
@@ -29,23 +34,6 @@ static bool            bind_method(ObjStruct* klass, ObjString* name);
 static bool            invoke(ObjString* name, int argc);
 static bool            invoke_from_class(ObjStruct* klass, ObjString* name, int argc);
 
-/* ── natives ── */
-static Value clock_native(int argc, Value* args) { return NUMBER_VAL((double)clock()/CLOCKS_PER_SEC); }
-static Value sqrt_native(int argc, Value* args)  { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(sqrt(AS_NUMBER(args[0]))); }
-static Value abs_native(int argc, Value* args)   { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(fabs(AS_NUMBER(args[0]))); }
-static Value floor_native(int argc, Value* args) { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(floor(AS_NUMBER(args[0]))); }
-static Value ceil_native(int argc, Value* args)  { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(ceil(AS_NUMBER(args[0]))); }
-static Value len_native(int argc, Value* args)   { if(argc!=1||!IS_STRING(args[0]))return NIL_VAL; return NUMBER_VAL((double)AS_STRING(args[0])->length); }
-static Value str_native(int argc, Value* args) {
-    if(argc!=1) return NIL_VAL;
-    if(IS_STRING(args[0])) return args[0];
-    char buf[64]; int len;
-    if     (IS_NUMBER(args[0])) len=snprintf(buf,sizeof(buf),"%g",AS_NUMBER(args[0]));
-    else if(IS_BOOL(args[0]))   len=snprintf(buf,sizeof(buf),"%s",AS_BOOL(args[0])?"true":"false");
-    else if(IS_NIL(args[0]))    len=snprintf(buf,sizeof(buf),"nil");
-    else return NIL_VAL;
-    return OBJ_VAL(copy_str(buf,len));
-}
 
 void define_native(const char* name, NativeFn fn) {
     push(OBJ_VAL(copy_str(name,(int)strlen(name))));
@@ -63,13 +51,9 @@ void init_lunar_vm() {
     init_table(&lvm.strings);
     lvm.init_string=NULL;
     lvm.init_string=copy_str("init",4);
-    define_native("clock",clock_native);
-    define_native("sqrt",sqrt_native);
-    define_native("abs",abs_native);
-    define_native("floor",floor_native);
-    define_native("ceil",ceil_native);
-    define_native("str",str_native);
-    define_native("len",len_native);
+
+    register_std_natives();
+
 #ifdef LUNAR_SDL
     register_sdl_natives();
 #endif
@@ -93,7 +77,7 @@ void push(Value val) {
 Value pop()                 { return *--lvm.stack_top; }
 static Value peek(int d)    { return lvm.stack_top[-1-d]; }
 
-static void runtime_error(const char* fmt, ...) {
+void runtime_error(const char* fmt, ...) {
     va_list args; va_start(args,fmt); vfprintf(stderr,fmt,args); va_end(args);
     fputs("\n",stderr);
     for(int i=lvm.frame_count-1;i>=0;i--){

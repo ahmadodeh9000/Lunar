@@ -4,7 +4,7 @@ LIBS   = -lm
 
 SRC = src/chunk.c src/compiler.c src/debug.c src/main.c \
       src/memory.c src/object.c src/scanner.c src/table.c \
-      src/value.c src/vm.c
+      src/value.c src/vm.c src/lunar_std.c 
 
 SDL_SRC = $(SRC) src/lunar_sdl.c
 
