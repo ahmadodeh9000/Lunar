@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ffi/ffi.h>
+
 
 #include "lunar_ffi.h"
 #include "vm.h"
@@ -15,6 +15,12 @@
 #include <windows.h>
 #else
 #include <dlfcn.h>
+#endif
+
+#ifdef __APPLE__
+#include <ffi/ffi.h>
+#else
+#include <ffi.h>
 #endif
 
 // Maps human-readable strings from scripts to libffi types and our structural validation types
