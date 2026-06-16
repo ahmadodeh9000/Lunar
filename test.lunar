@@ -1,0 +1,89 @@
+
+
+// window variables 
+
+let WINDOW_WIDTH 	= 800;
+let WINDOW_HEIGHT	= 600;
+let WINDOW_TITLE	= "Ahmad SDL APP";
+
+
+
+
+// setting sdl2 
+sdl_init(WINDOW_TITLE,WINDOW_WIDTH,WINDOW_HEIGHT);
+
+
+
+// main loop
+
+
+let running = true;
+
+
+// player 
+
+let pw = 20;
+let ph = 20;
+
+
+let px = WINDOW_WIDTH / 2 - pw;
+let py = WINDOW_HEIGHT / 2 - ph;
+
+
+
+while (running) {
+	let ev = sdl_poll();
+
+
+	
+
+	if (ev == "quit" || sdl_key_down("escape")) {
+		running = false;
+	}
+
+
+	if (px >= WINDOW_WIDTH - pw) {
+		px = 0;
+	}
+
+	if (px < 0) {
+		px = WINDOW_WIDTH - pw;
+	}
+
+	if (py >= WINDOW_HEIGHT - ph) {
+		py = 0;
+	}
+
+	if (py < 0) {
+		py = WINDOW_HEIGHT - ph;
+	}
+
+	if (sdl_key_down("w")) {
+		py = py - 5;
+	}
+
+	if (sdl_key_down("s")) {
+		py = py + 5;
+	}
+
+	if (sdl_key_down("d")) {
+		px = px + 5;
+	}
+
+	if (sdl_key_down("a")) {
+		px = px - 5;
+	}
+
+
+	sdl_clear(hex("0xFF"),hex("0xFF"),hex("0xFF"));
+
+	sdl_fill_rect(px, py, pw, ph, 80, 200, 255, 255);
+	
+	sdl_present();
+	sdl_delay(16);
+
+}
+
+sdl_quit();
+
+

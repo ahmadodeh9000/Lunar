@@ -4,6 +4,7 @@
 #include "object.h"
 #include "memory.h"
 #include "table.h"
+#include "lunar_ffi.h"
 
 #ifdef LUNAR_SDL
 #include "lunar_sdl.h"
@@ -53,6 +54,16 @@ void init_lunar_vm() {
     lvm.init_string=copy_str("init",4);
 
     register_std_natives();
+
+    ObjNative* ffiLoadNative = new_native(ffi_load_library, "ffiLoad");
+    push(OBJ_VAL(ffiLoadNative)); // Push to stack to protect from a sudden GC sweep
+    table_set(&lvm.globals, copy_str("ffiLoad", 7), OBJ_VAL(ffiLoadNative));
+    pop(); // Safely pop it back off
+
+    ObjNative* ffiBindNative = new_native(ffi_bind_function, "ffiBind");
+    push(OBJ_VAL(ffiBindNative));
+    table_set(&lvm.globals, copy_str("ffiBind", 7), OBJ_VAL(ffiBindNative));
+    pop();
 
 #ifdef LUNAR_SDL
     register_sdl_natives();
@@ -134,6 +145,24 @@ static bool call_value(Value callee, int argc) {
             lvm.stack_top[-argc-1]=bm->receiver;
             return call(bm->method,argc);
         }
+
+        case OBJ_FFI_FUNC: {
+            ObjFFIFunc* func = AS_FFI_FUNC(callee);
+            
+            // The arguments are sitting on the stack right before the top
+            Value* args = lvm.stack_top - argc;
+            
+            // Invoke the FFI engine directly!
+            Value result = ffi_call_bound(func, argc,args);
+            
+            // Wind down the stack frame: pop args and the function object itself
+            lvm.stack_top -= argc + 1;
+            
+            // Push the results right back up
+            push(result);
+            return true;
+        }
+
         default: runtime_error("Can only call functions and structs."); return false;
     }
 }

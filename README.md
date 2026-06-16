@@ -353,6 +353,110 @@ print factorial(10);   // 3628800
 
 ---
 
+## Foreign Function Interface (FFI)
+
+Lunar features a powerful, zero-boilerplate FFI powered by `libffi`. This allows you to load native system binaries or your own custom compiled C code dynamically at runtime, marshaling values automatically across the language boundary.
+
+### Core Lifecycle
+
+```lunar
+ffiLoad(path)           // Loads a shared library handle (.dylib, .so, .dll)
+                        // Note: Pass an empty string "" on macOS/Linux to look up system symbols
+                        
+ffiBind(lib, name, ret_type, param1, param2, ...) 
+                        // Binds a native symbol and returns a callable closure
+```
+
+for example
+
+```
+
+// On macOS, passing nil or an empty string to dlopen searches the current process
+let libc = ffiLoad(""); 
+
+if (libc) {
+    print "Successfully loaded system library!";
+    
+
+    let c_puts = ffiBind(libc, "puts", "int", "string");
+    
+    if (c_puts) {
+        print "Successfully bound 'puts' from C!";
+
+        c_puts("Hello safely from the Lunar FFI pipeline!");
+    } else {
+        print "Failed to bind 'puts'.";
+    }
+} else {
+    print "Failed to load system library.";
+}
+
+```
+
+Another example 
+
+in C 
+```
+// from a c file (test_ffi.c)
+#include <stdio.h>
+
+// We use attribute((visibility("default"))) to ensure macOS exports the symbol 
+__attribute__((visibility("default")))
+void greet_ahmad(const char* greeting) {
+    printf("%s, Ahmad!\n", greeting);
+}
+
+__attribute__((visibility("default")))
+int add_numbers(int a, int b) {
+    return a + b;
+}
+```
+then we use 
+
+```
+gcc -dynamiclib -o libcustom.dylib test_ffi.c
+```
+
+Now we call the C function in Lunar 
+```
+
+// Load our local custom library by passing its relative path
+let mylib = ffiLoad("./libcustom.dylib");
+
+if (mylib) {
+    print "Successfully loaded libcustom.dylib!";
+
+    // 1. Bind our custom greeting function: void greet_ahmad(const char* greeting)
+    let greet = ffiBind(mylib, "greet_ahmad", "void", "string");
+    
+    if (greet) {
+        print "Calling greet_ahmad via FFI...";
+        greet("Welcome back"); // Should print: Welcome back, Ahmad!
+    } else {
+        print "Failed to bind greet_ahmad.";
+    }
+
+    print "---------------------------------------";
+
+    // 2. Bind our custom math function: int add_numbers(int a, int b)
+    let add = ffiBind(mylib, "add_numbers", "int", "int", "int");
+    
+    if (add) {
+        print "Calling add_numbers(15, 27)...";
+        let sum = add(15, 27);
+        print "Result from custom C library:";
+        print sum; // Should print 42
+    } else {
+        print "Failed to bind add_numbers.";
+    }
+
+} else {
+    print "Failed to load libcustom.dylib. Make sure the path is correct!";
+}
+
+```
+
+
 ## SDL2 API
 
 Only available when built with `make sdl`.
@@ -508,24 +612,6 @@ source (.lunar)
        ▼
    GC               tri-color mark-and-sweep, triggered by allocation
 ```
-
-### Source files
-
-| File              | Purpose                                             |
-|-------------------|-----------------------------------------------------|
-| `src/scanner.c`   | Lexer — keywords, literals, operators               |
-| `src/compiler.c`  | Pratt parser + bytecode emitter                     |
-| `src/vm.c`        | Bytecode interpreter, call frames, native registry  |
-| `src/chunk.c`     | Bytecode array + constant pool                      |
-| `src/object.c`    | Heap objects: strings, functions, closures, structs |
-| `src/table.c`     | Hash table — open addressing, FNV-1a hashing        |
-| `src/memory.c`    | Allocator + tri-color mark-and-sweep GC             |
-| `src/debug.c`     | Bytecode disassembler                               |
-| `src/lunar_sdl.c` | SDL2 native bindings (optional)                     |
-| `src/main.c`      | Entry point — REPL + file runner                    |
-
-
-
 ## License
 
 MIT

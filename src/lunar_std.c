@@ -1,3 +1,9 @@
+/*
+* I don't if i should keep it or not, since i added FFI ig they are useless for now,
+* but anyway no one give a shit so yeah...
+*/
+
+
 
 #include "lunar_std.h"
 #include "vm.h"
@@ -12,7 +18,7 @@
 #include <string.h>
 #include <time.h>
 
-/* ── natives ── */
+/* ── natives -- */
 static Value clock_native(int argc, Value* args) { return NUMBER_VAL((double)clock()/CLOCKS_PER_SEC); }
 static Value sqrt_native(int argc, Value* args)  { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(sqrt(AS_NUMBER(args[0]))); }
 static Value abs_native(int argc, Value* args)   { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(fabs(AS_NUMBER(args[0]))); }

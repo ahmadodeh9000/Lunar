@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+
 #include "memory.h"
 #include "object.h"
 #include "value.h"
@@ -127,6 +128,25 @@ ObjBoundMethod* new_bound_method(Value receiver, ObjClosure* method) {
     return bm;
 }
 
+ObjFFILib* new_ffi_lib(ObjString* path, void* handle) {
+    ObjFFILib* lib = ALLOCATE_OBJ(ObjFFILib, OBJ_FFI_LIB);
+    lib->path = path;
+    lib->handle = handle;
+    return lib;
+}
+
+ObjFFIFunc* new_ffi_func(ObjString* name, void* symbol) {
+    ObjFFIFunc* func = ALLOCATE_OBJ(ObjFFIFunc, OBJ_FFI_FUNC);
+    func->name = name;
+    func->func_ptr = symbol;
+    func->arg_count = 0;
+    func->arg_types = NULL;
+    func->lunar_arg_types = NULL;
+    func->rtype = NULL;
+    func->lunar_return_type = 0;
+    return func;
+}
+
 static void print_function(ObjFunction* fn) {
     if (fn->name == NULL) {
         printf("<script>");
@@ -160,6 +180,14 @@ void printObject(Value value) {
             break;
         case OBJ_BOUND_METHOD:
             print_function(AS_BOUND_METHOD(value)->method->function);
+            break;
+
+
+        case OBJ_FFI_LIB:
+            printf("<ffi library '%s'>", AS_FFI_LIB(value)->path->chars);
+            break;
+        case OBJ_FFI_FUNC:
+            printf("<ffi native fn '%s'>", AS_FFI_FUNC(value)->name->chars);
             break;
     }
 }
