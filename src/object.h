@@ -1,6 +1,9 @@
 #ifndef lunar_object_h
 #define lunar_object_h
 
+#include <ffi/ffi.h> // thanks C for this
+
+
 #include "common.h"
 #include "value.h"
 #include "chunk.h"
@@ -15,6 +18,8 @@ typedef enum {
     OBJ_STRUCT,
     OBJ_INSTANCE,
     OBJ_BOUND_METHOD,
+    OBJ_FFI_LIB, 
+    OBJ_FFI_FUNC , 
 } ObjType;
 
 struct Obj {
@@ -87,6 +92,27 @@ typedef struct {
 } ObjBoundMethod;
 
 
+/* ── FFI Shared Library ── */
+typedef struct {
+    Obj obj;
+    void* handle;      
+    ObjString* path;   
+} ObjFFILib;
+
+/* ── FFI Bound Function ── */
+typedef struct {
+    Obj obj;
+    void* func_ptr;    
+    ObjString* name;
+    ffi_cif cif;       // Safe now that ffi.h is included at top
+    ffi_type** arg_types;
+    ffi_type* rtype;
+    int arg_count;
+    int* lunar_arg_types; 
+    int lunar_return_type;
+} ObjFFIFunc;
+
+
 /* ──────── helpers ──────── */
 
 static inline bool is_obj_type(Value value, ObjType type) {
@@ -102,6 +128,8 @@ static inline bool is_obj_type(Value value, ObjType type) {
 #define IS_STRUCT(value)        is_obj_type(value, OBJ_STRUCT)
 #define IS_INSTANCE(value)      is_obj_type(value, OBJ_INSTANCE)
 #define IS_BOUND_METHOD(value)  is_obj_type(value, OBJ_BOUND_METHOD)
+#define IS_FFI_LIB(value)       is_obj_type(value, OBJ_FFI_LIB)
+#define IS_FFI_FUNC(value)      is_obj_type(value, OBJ_FFI_FUNC)
 
 #define AS_STRING(value)        ((ObjString*)AS_OBJ(value))
 #define AS_CSTRING(value)       (((ObjString*)AS_OBJ(value))->chars)
@@ -111,6 +139,8 @@ static inline bool is_obj_type(Value value, ObjType type) {
 #define AS_STRUCT(value)        ((ObjStruct*)AS_OBJ(value))
 #define AS_INSTANCE(value)      ((ObjInstance*)AS_OBJ(value))
 #define AS_BOUND_METHOD(value)  ((ObjBoundMethod*)AS_OBJ(value))
+#define AS_FFI_LIB(value)       ((ObjFFILib*)AS_OBJ(value))       // FFI
+#define AS_FFI_FUNC(value)      ((ObjFFIFunc*)AS_OBJ(value))      // FFI
 
 
 ObjString*      copy_str(const char* chars, int length);
@@ -122,6 +152,9 @@ ObjUpvalue*     new_upvalue(Value* slot);
 ObjStruct*      new_struct(ObjString* name);
 ObjInstance*    new_instance(ObjStruct* klass);
 ObjBoundMethod* new_bound_method(Value receiver, ObjClosure* method);
+ObjFFILib* new_ffi_lib(ObjString* path, void* handle);      // FFI
+ObjFFIFunc* new_ffi_func(ObjString* name, void* symbol);    // FFI
+
 
 void printObject(Value value);
 

@@ -3,6 +3,7 @@
 
 #include "chunk.h"
 #include "object.h"
+#include <ffi/ffi.h>
 
 ObjFunction* compile(const char* src);
 void mark_compiler_roots();

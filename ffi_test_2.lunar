@@ -1,0 +1,33 @@
+// Load our local custom library by passing its relative path
+let mylib = ffiLoad("./libcustom.dylib");
+
+if (mylib) {
+    print "Successfully loaded libcustom.dylib!";
+
+    // 1. Bind our custom greeting function: void greet_ahmad(const char* greeting)
+    let greet = ffiBind(mylib, "greet_ahmad", "void", "string");
+    
+    if (greet) {
+        print "Calling greet_ahmad via FFI...";
+        greet("Welcome back"); // Should print: Welcome back, Ahmad!
+    } else {
+        print "Failed to bind greet_ahmad.";
+    }
+
+    print "---------------------------------------";
+
+    // 2. Bind our custom math function: int add_numbers(int a, int b)
+    let add = ffiBind(mylib, "add_numbers", "int", "int", "int");
+    
+    if (add) {
+        print "Calling add_numbers(15, 27)...";
+        let sum = add(15, 27);
+        print "Result from custom C library:";
+        print sum; // Should print 42
+    } else {
+        print "Failed to bind add_numbers.";
+    }
+
+} else {
+    print "Failed to load libcustom.dylib. Make sure the path is correct!";
+}

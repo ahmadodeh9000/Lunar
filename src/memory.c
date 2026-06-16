@@ -6,6 +6,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <ffi/ffi.h>
+
+#ifndef _WIN32
+#include <dlfcn.h>  // FIX SHIT
+#endif
 
 #define GC_HEAP_GROW_FACTOR 2
 
@@ -158,6 +163,17 @@ static void blacken_object(Obj* object) {
         case OBJ_NATIVE:
         case OBJ_STRING:
             break; // no outgoing references
+// don't touch this shit please ahmad  - ahmad
+        case OBJ_FFI_LIB: {
+            ObjFFILib* lib = (ObjFFILib*)object;
+            mark_object((Obj*)lib->path); // Fixed typo here
+            break;
+        }
+        case OBJ_FFI_FUNC: {
+            ObjFFIFunc* func = (ObjFFIFunc*)object;
+            mark_object((Obj*)func->name); // Fixed typo here
+            break;
+        }
     }
 }
 
@@ -271,6 +287,25 @@ void freeObject(Obj* object) {
         case OBJ_BOUND_METHOD:
             FREE(ObjBoundMethod, object);
             break;
+
+        case OBJ_FFI_LIB: {
+            ObjFFILib* lib = (ObjFFILib*)object;
+#ifdef _WIN32
+            FreeLibrary((HMODULE)lib->handle);
+#else
+            dlclose(lib->handle); // Cleaned up the placeholder function call
+#endif
+            FREE(ObjFFILib, object);
+            break;
+        }
+        case OBJ_FFI_FUNC: {
+            ObjFFIFunc* func = (ObjFFIFunc*)object;
+            // Free the arrays allocated during ffiBind
+            FREE_ARRAY(ffi_type*, func->arg_types, func->arg_count);
+            FREE_ARRAY(int, func->lunar_arg_types, func->arg_count);
+            FREE(ObjFFIFunc, object);
+            break;
+        }
     }
 }
 
