@@ -4,10 +4,12 @@
 #include "chunk.h"
 #include "object.h"
 
-#ifdef __APPLE__
+#if __has_include(<ffi.h>)
+#include <ffi.h>
+#elif __has_include(<ffi/ffi.h>)
 #include <ffi/ffi.h>
 #else
-#include <ffi.h>
+#error "libffi header not found"
 #endif
 
 ObjFunction* compile(const char* src);

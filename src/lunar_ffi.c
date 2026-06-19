@@ -17,10 +17,12 @@
 #include <dlfcn.h>
 #endif
 
-#ifdef __APPLE__
+#if __has_include(<ffi.h>)
+#include <ffi.h>
+#elif __has_include(<ffi/ffi.h>)
 #include <ffi/ffi.h>
 #else
-#include <ffi.h>
+#error "libffi header not found"
 #endif
 
 // Maps human-readable strings from scripts to libffi types and our structural validation types

@@ -1,7 +1,13 @@
 #ifndef lunar_object_h
 #define lunar_object_h
 
-#include <ffi/ffi.h> // thanks C for this
+#if __has_include(<ffi.h>)
+#include <ffi.h>
+#elif __has_include(<ffi/ffi.h>)
+#include <ffi/ffi.h>
+#else
+#error "libffi header not found"
+#endif
 
 
 #include "common.h"

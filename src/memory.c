@@ -6,7 +6,13 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#if __has_include(<ffi.h>)
+#include <ffi.h>
+#elif __has_include(<ffi/ffi.h>)
 #include <ffi/ffi.h>
+#else
+#error "libffi header not found"
+#endif
 
 #ifndef _WIN32
 #include <dlfcn.h>  // FIX SHIT
