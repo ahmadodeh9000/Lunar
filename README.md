@@ -372,13 +372,13 @@ for example
 ```
 
 // On macOS, passing nil or an empty string to dlopen searches the current process
-let libc = ffiLoad(""); 
+let libc = clib(""); 
 
 if (libc) {
     print "Successfully loaded system library!";
     
 
-    let c_puts = ffiBind(libc, "puts", "int", "string");
+    let c_puts = cbind(libc, "puts", "int", "string");
     
     if (c_puts) {
         print "Successfully bound 'puts' from C!";
@@ -421,13 +421,13 @@ Now we call the C function in Lunar
 ```
 
 // Load our local custom library by passing its relative path
-let mylib = ffiLoad("./libcustom.dylib");
+let mylib = clib("./libcustom.dylib");
 
 if (mylib) {
     print "Successfully loaded libcustom.dylib!";
 
     // 1. Bind our custom greeting function: void greet_ahmad(const char* greeting)
-    let greet = ffiBind(mylib, "greet_ahmad", "void", "string");
+    let greet = cbind(mylib, "greet_ahmad", "void", "string");
     
     if (greet) {
         print "Calling greet_ahmad via FFI...";
@@ -439,7 +439,7 @@ if (mylib) {
     print "---------------------------------------";
 
     // 2. Bind our custom math function: int add_numbers(int a, int b)
-    let add = ffiBind(mylib, "add_numbers", "int", "int", "int");
+    let add = cbind(mylib, "add_numbers", "int", "int", "int");
     
     if (add) {
         print "Calling add_numbers(15, 27)...";

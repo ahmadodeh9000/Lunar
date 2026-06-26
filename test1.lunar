@@ -1,0 +1,8 @@
+
+
+let libc = clib("");
+
+let cput = cbind(libc, "puts", "int", "string");
+
+cput("test");
+

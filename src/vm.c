@@ -55,14 +55,14 @@ void init_lunar_vm() {
 
     register_std_natives();
 
-    ObjNative* ffiLoadNative = new_native(ffi_load_library, "ffiLoad");
+    ObjNative* ffiLoadNative = new_native(ffi_load_library, "clib");
     push(OBJ_VAL(ffiLoadNative)); // Push to stack to protect from a sudden GC sweep
-    table_set(&lvm.globals, copy_str("ffiLoad", 7), OBJ_VAL(ffiLoadNative));
+    table_set(&lvm.globals, copy_str("clib", 4), OBJ_VAL(ffiLoadNative));
     pop(); // Safely pop it back off
 
-    ObjNative* ffiBindNative = new_native(ffi_bind_function, "ffiBind");
+    ObjNative* ffiBindNative = new_native(ffi_bind_function, "cbind");
     push(OBJ_VAL(ffiBindNative));
-    table_set(&lvm.globals, copy_str("ffiBind", 7), OBJ_VAL(ffiBindNative));
+    table_set(&lvm.globals, copy_str("cbind", 5), OBJ_VAL(ffiBindNative));
     pop();
 
 #ifdef LUNAR_SDL

@@ -88,10 +88,13 @@ static Value sdl_poll_native(i32 argc, Value* args) {
 }
 
 static Value sdl_clear_native(i32 argc, Value* args) {
+
+    // I don't know if I should alpha as default 255 or not
+
     i32 r = (i32)AS_NUMBER(args[0]);
     i32 g = (i32)AS_NUMBER(args[1]);
     i32 b = (i32)AS_NUMBER(args[2]);
-    SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+    SDL_SetRenderDrawColor(renderer, r, g, b, 0xFF);
     SDL_RenderClear(renderer);
     return NIL_VAL;
 }
