@@ -340,16 +340,17 @@ print factorial(10);   // 3628800
 
 ## Built-in Functions
 
-| Function   | Signature           | Description                    |
-|------------|---------------------|--------------------------------|
-| `print`    | `print x`           | Print value with newline       |
-| `clock()`  | `() → number`       | Seconds since program start    |
-| `sqrt(x)`  | `(number) → number` | Square root                    |
-| `abs(x)`   | `(number) → number` | Absolute value                 |
-| `floor(x)` | `(number) → number` | Round toward negative infinity |
-| `ceil(x)`  | `(number) → number` | Round toward positive infinity |
-| `str(x)`   | `(any) → string`    | Convert any value to string    |
-| `len(s)`   | `(string) → number` | String length in bytes         |
+| Function      | Signature           | Description                         |
+|---------------|---------------------|-------------------------------------|
+| `print`       | `print x`           | Print value with newline            |
+| `clock()`     | `() → number`       | Seconds since program start         |
+| `sqrt(x)`     | `(number) → number` | Square root                         |
+| `abs(x)`      | `(number) → number` | Absolute value                      |
+| `floor(x)`    | `(number) → number` | Round toward negative infinity      |
+| `ceil(x)`     | `(number) → number` | Round toward positive infinity      |
+| `str(x)`      | `(any) → string`    | Convert any value to string         |
+| `len(s)`      | `(string) → number` | String length in bytes              |
+| `random(x,y)` | `(r1,r2) → nnumber` | Gives us a random number in [r1,r2] |
 
 ---
 

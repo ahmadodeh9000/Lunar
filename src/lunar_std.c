@@ -53,7 +53,22 @@ static Value str_native(int argc, Value* args) {
     return OBJ_VAL(copy_str(buf,len));
 }
 
+static Value random_native(int argc, Value* args) {
+    
+    if(argc!=2  ||  !IS_NUMBER(args[0]) || !IS_NUMBER(args[1])) {
+        return NIL_VAL;
+    }
 
+    int min = AS_NUMBER(args[0]);
+    int max = AS_NUMBER(args[1]);
+
+
+    srand(time(0));
+    int rand_val = rand() % (max - min + 1) + min;
+
+    return NUMBER_VAL(rand_val);
+
+}
 
 void register_std_natives() {
 
@@ -65,5 +80,6 @@ void register_std_natives() {
     define_native("str",str_native);
     define_native("len",len_native);
     define_native("hex",hex_native);
+    define_native("random",random_native);
 }
 

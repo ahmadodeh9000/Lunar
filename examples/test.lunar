@@ -75,7 +75,7 @@ while (running) {
 	}
 
 
-	sdl_clear(hex("0xFF"),hex("0xFF"),hex("0xFF"));
+	sdl_clear(hex("0x00"),hex("0x00"),hex("0x00"));
 
 	sdl_fill_rect(px, py, pw, ph, 80, 200, 255, 255);
 	
