@@ -25,7 +25,8 @@ d.speak();
 - **Structs & single inheritance** — `self`, `super`, bound methods, dynamic fields
 - **String interning** — strings deduplicated via FNV-1a hash table, pointer equality comparison
 - **Bitwise operators** — `&` `|` `^` `~` `<<` `>>`
-- **SDL2 support** — optional build target for 2D graphics, images, text, keyboard and mouse
+- **Foreign Function Interface** — call into native shared libraries via `libffi`
+- **SDL2 support** — optional build target for 2D graphics, textures, and keyboard input
 
 ---
 
@@ -46,17 +47,17 @@ make
 
 ### Build with SDL2
 
-Install SDL2 first:
+Install SDL2 and SDL2_image first:
 
 ```bash
 # Ubuntu / Debian
-sudo apt install libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev
+sudo apt install libsdl2-dev libsdl2-image-dev
 
 # Arch
-sudo pacman -S sdl2 sdl2_image sdl2_ttf
+sudo pacman -S sdl2 sdl2_image
 
 # macOS
-brew install sdl2 sdl2_image sdl2_ttf
+brew install sdl2 sdl2_image
 ```
 
 ```bash
@@ -341,7 +342,7 @@ print factorial(10);   // 3628800
 ## Built-in Functions
 
 | Function      | Signature           | Description                         |
-|---------------|---------------------|-------------------------------------|
+|---------------|---------------------|--------------------------------------|
 | `print`       | `print x`           | Print value with newline            |
 | `clock()`     | `() → number`       | Seconds since program start         |
 | `sqrt(x)`     | `(number) → number` | Square root                         |
@@ -350,7 +351,7 @@ print factorial(10);   // 3628800
 | `ceil(x)`     | `(number) → number` | Round toward positive infinity      |
 | `str(x)`      | `(any) → string`    | Convert any value to string         |
 | `len(s)`      | `(string) → number` | String length in bytes              |
-| `random(x,y)` | `(r1,r2) → nnumber` | Gives us a random number in [r1,r2] |
+| `random(x,y)` | `(r1,r2) → number`  | Random number in [r1,r2]            |
 
 ---
 
@@ -361,29 +362,26 @@ Lunar features a powerful, zero-boilerplate FFI powered by `libffi`. This allows
 ### Core Lifecycle
 
 ```lunar
-ffiLoad(path)           // Loads a shared library handle (.dylib, .so, .dll)
+clib(path)              // Loads a shared library handle (.dylib, .so, .dll)
                         // Note: Pass an empty string "" on macOS/Linux to look up system symbols
-                        
-ffiBind(lib, name, ret_type, param1, param2, ...) 
+
+cbind(lib, name, ret_type, param1, param2, ...)
                         // Binds a native symbol and returns a callable closure
 ```
 
-for example
+Example — calling a system function:
 
-```
-
-// On macOS, passing nil or an empty string to dlopen searches the current process
-let libc = clib(""); 
+```lunar
+// On macOS, passing an empty string to clib searches the current process
+let libc = clib("");
 
 if (libc) {
     print "Successfully loaded system library!";
-    
 
     let c_puts = cbind(libc, "puts", "int", "string");
-    
+
     if (c_puts) {
         print "Successfully bound 'puts' from C!";
-
         c_puts("Hello safely from the Lunar FFI pipeline!");
     } else {
         print "Failed to bind 'puts'.";
@@ -391,17 +389,15 @@ if (libc) {
 } else {
     print "Failed to load system library.";
 }
-
 ```
 
-Another example 
+Example — calling your own compiled C code:
 
-in C 
-```
-// from a c file (test_ffi.c)
+```c
+// test_ffi.c
 #include <stdio.h>
 
-// We use attribute((visibility("default"))) to ensure macOS exports the symbol 
+// We use attribute((visibility("default"))) to ensure macOS exports the symbol
 __attribute__((visibility("default")))
 void greet_ahmad(const char* greeting) {
     printf("%s, Ahmad!\n", greeting);
@@ -412,15 +408,12 @@ int add_numbers(int a, int b) {
     return a + b;
 }
 ```
-then we use 
 
-```
+```bash
 gcc -dynamiclib -o libcustom.dylib test_ffi.c
 ```
 
-Now we call the C function in Lunar 
-```
-
+```lunar
 // Load our local custom library by passing its relative path
 let mylib = clib("./libcustom.dylib");
 
@@ -429,7 +422,7 @@ if (mylib) {
 
     // 1. Bind our custom greeting function: void greet_ahmad(const char* greeting)
     let greet = cbind(mylib, "greet_ahmad", "void", "string");
-    
+
     if (greet) {
         print "Calling greet_ahmad via FFI...";
         greet("Welcome back"); // Should print: Welcome back, Ahmad!
@@ -441,7 +434,7 @@ if (mylib) {
 
     // 2. Bind our custom math function: int add_numbers(int a, int b)
     let add = cbind(mylib, "add_numbers", "int", "int", "int");
-    
+
     if (add) {
         print "Calling add_numbers(15, 27)...";
         let sum = add(15, 27);
@@ -450,23 +443,22 @@ if (mylib) {
     } else {
         print "Failed to bind add_numbers.";
     }
-
 } else {
     print "Failed to load libcustom.dylib. Make sure the path is correct!";
 }
-
 ```
 
+---
 
 ## SDL2 API
 
-Only available when built with `make sdl`.
+Only available when built with `make sdl` (requires SDL2 and SDL2_image).
 
 ### Lifecycle
 
 ```lunar
-sdl_init("Title", 800, 600);   // open window + renderer
-sdl_quit();                     // destroy window, free resources
+sdl_init("Title", 800, 600);   // open window + renderer, init SDL_image
+sdl_quit();                     // destroy window, free textures, quit SDL
 ```
 
 ### Game Loop Pattern
@@ -491,50 +483,37 @@ sdl_quit();
 ### Drawing
 
 ```lunar
-sdl_clear(r, g, b)                          // clear screen with color
-sdl_fill_rect(x, y, w, h, r, g, b, a)      // filled rectangle
-sdl_draw_rect(x, y, w, h, r, g, b, a)      // outlined rectangle
-sdl_draw_line(x1, y1, x2, y2, r, g, b, a)  // line
-sdl_draw_point(x, y, r, g, b, a)           // single pixel
-sdl_present()                               // flip buffer to screen
+sdl_clear(r, g, b)                     // clear screen with color
+sdl_fill_rect(x, y, w, h, r, g, b, a)  // filled rectangle
+sdl_present()                          // flip buffer to screen
 ```
 
-### Images
+### Textures
+
+Textures are referenced by an integer handle returned from `sdl_load_texture`.
 
 ```lunar
-let img = sdl_load_image("player.png");
-sdl_draw_image(img, x, y, w, h);
-sdl_draw_image_ex(img, x, y, w, h, angle, flip);
-sdl_free_image(img);
+let tex = sdl_load_texture("player.png");  // returns handle, or -1 on failure
+sdl_draw_texture(tex, x, y, w, h);         // draw scaled into a dest rect
+sdl_texture_width(tex);                    // native pixel width
+sdl_texture_height(tex);                   // native pixel height
 ```
 
-### Text
-
-```lunar
-let font = sdl_load_font("font.ttf", 24);
-sdl_draw_text(font, "Score: " + str(score), x, y, r, g, b);
-sdl_free_font(font);
-```
+Textures are freed automatically on `sdl_quit()`; there is currently no way to unload a single texture early.
 
 ### Input
 
 ```lunar
-let e = sdl_poll();      // "quit" | "keydown" | "keyup"
-                         // "mousemove" | "mousedown" | "mouseup" | nil
+let e = sdl_poll();      // "quit" | nil
 
 sdl_key_down("left")     // true if key currently held
                          // keys: "up" "down" "left" "right"
                          //       "space" "escape" "w" "a" "s" "d"
-
-sdl_mouse_x()            // current cursor x
-sdl_mouse_y()            // current cursor y
-sdl_mouse_down(1)        // true if button held (1=left 2=middle 3=right)
 ```
 
 ### Timing
 
 ```lunar
-sdl_ticks()    // milliseconds since sdl_init
 sdl_delay(16)  // sleep ms — use in loop for ~60fps cap
 ```
 
