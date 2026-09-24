@@ -68,8 +68,8 @@ gc-stress: $(SRC)
 		-o $(GCSTRESS_TARGET) $(SRC) $(LIBS) $(FFI_LIBS)
 
 sdl: $(SDL_SRC)
-	$(CC) $(CFLAGS) $(FFI_CFLAGS) $(shell pkg-config --cflags sdl2) -O2 -DLUNAR_SDL \
-		-o $(TARGET) $(SDL_SRC) $(shell pkg-config --libs sdl2) $(LIBS) $(FFI_LIBS)
+	$(CC) $(CFLAGS) $(FFI_CFLAGS) $(shell pkg-config --cflags sdl2 SDL2_image) -O2 -DLUNAR_SDL \
+	    -o $(TARGET) $(SDL_SRC) $(shell pkg-config --libs sdl2 SDL2_image) $(LIBS) $(FFI_LIBS)
 
 clean:
 	rm -f $(TARGET) $(DEBUG_TARGET) $(GCSTRESS_TARGET)

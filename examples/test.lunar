@@ -1,89 +1,166 @@
+// window variables
+
+let WINDOW_WIDTH  = 800;
+let WINDOW_HEIGHT = 600;
+let WINDOW_TITLE  = "Ahmad SDL APP";
 
 
-// window variables 
-
-let WINDOW_WIDTH 	= 800;
-let WINDOW_HEIGHT	= 600;
-let WINDOW_TITLE	= "Ahmad SDL APP";
+// setting sdl2
+sdl_init(WINDOW_TITLE, WINDOW_WIDTH, WINDOW_HEIGHT);
 
 
-
-
-// setting sdl2 
-sdl_init(WINDOW_TITLE,WINDOW_WIDTH,WINDOW_HEIGHT);
-
-
-
-// main loop
-
-
-let running = true;
-
-
-// player 
+// player — gravity pulls it down, SPACE gives an upward flap
 
 let pw = 20;
 let ph = 20;
 
+let px = 60;
+let py = WINDOW_HEIGHT / 2 - ph / 2;
+let pVelY = 0;
 
-let px = WINDOW_WIDTH / 2 - pw;
-let py = WINDOW_HEIGHT / 2 - ph;
+let GRAVITY = 0.6;
+let FLAP_VELOCITY = -9;
+
+let spaceHeldLast = false;
+
+fn clamp(v, lo, hi) {
+    if (v < lo) ret lo;
+    if (v > hi) ret hi;
+    ret v;
+}
 
 
+// obstacles — singly linked list of gap-pipes scrolling right to left
+
+struct Obstacle {
+    init(x, gapY, gapH) {
+        self.x    = x;
+        self.gapY = gapY;
+        self.gapH = gapH;
+        self.next = nil;
+    }
+}
+
+let OB_W        = 60;
+let GAP_H       = 150;
+let OB_SPEED    = 4;
+let SPAWN_EVERY = 90;   // frames between new obstacles
+
+let head = nil;
+let tail = nil;
+
+fn spawnObstacle() {
+    let gapY = random(40, WINDOW_HEIGHT - GAP_H - 40);
+    let ob = Obstacle(WINDOW_WIDTH, gapY, GAP_H);
+
+    if (head == nil) {
+        head = ob;
+        tail = ob;
+    } else {
+        tail.next = ob;
+        tail = ob;
+    }
+}
+
+fn rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+    if (ax + aw <= bx) ret false;
+    if (bx + bw <= ax) ret false;
+    if (ay + ah <= by) ret false;
+    if (by + bh <= ay) ret false;
+    ret true;
+}
+
+
+// main loop
+
+let running  = true;
+let frame    = 0;
+let gameOver = false;
 
 while (running) {
-	let ev = sdl_poll();
+    let ev = sdl_poll();
 
+    if (ev == "quit" || sdl_key_down("escape")) {
+        running = false;
+    }
 
-	
+    if (!gameOver) {
+        // flap on the transition from key-up to key-down (edge detect,
+        // so holding space doesn't flap every single frame)
+        let spaceNow = sdl_key_down("space");
+        if (spaceNow && !spaceHeldLast) {
+            pVelY = FLAP_VELOCITY;
+        }
+        spaceHeldLast = spaceNow;
 
-	if (ev == "quit" || sdl_key_down("escape")) {
-		running = false;
-	}
+        // gravity
+        pVelY = pVelY + GRAVITY;
+        py = py + pVelY;
 
+        // ceiling: clamp, don't die
+        if (py < 0) {
+            py = 0;
+            pVelY = 0;
+        }
 
-	if (px >= WINDOW_WIDTH - pw) {
-		px = 0;
-	}
+        // floor: dying like hitting the ground in flappy bird
+        if (py + ph >= WINDOW_HEIGHT) {
+            py = WINDOW_HEIGHT - ph;
+            gameOver = true;
+        }
 
-	if (px < 0) {
-		px = WINDOW_WIDTH - pw;
-	}
+        // spawn obstacles
+        frame = frame + 1;
+        if (frame % SPAWN_EVERY == 0) {
+            spawnObstacle();
+        }
 
-	if (py >= WINDOW_HEIGHT - ph) {
-		py = 0;
-	}
+        // advance obstacles + collision check
+        let node = head;
+        while (node != nil) {
+            node.x = node.x - OB_SPEED;
 
-	if (py < 0) {
-		py = WINDOW_HEIGHT - ph;
-	}
+            let hitTop = rectsOverlap(px, py, pw, ph,
+                                       node.x, 0, OB_W, node.gapY);
+            let hitBottom = rectsOverlap(px, py, pw, ph,
+                                          node.x, node.gapY + node.gapH,
+                                          OB_W, WINDOW_HEIGHT - (node.gapY + node.gapH));
 
-	if (sdl_key_down("w")) {
-		py = py - 5;
-	}
+            if (hitTop || hitBottom) {
+                gameOver = true;
+            }
 
-	if (sdl_key_down("s")) {
-		py = py + 5;
-	}
+            node = node.next;
+        }
 
-	if (sdl_key_down("d")) {
-		px = px + 5;
-	}
+        // drop the oldest obstacle once it's fully off-screen
+        if (head != nil && head.x + OB_W < 0) {
+            head = head.next;
+            if (head == nil) { tail = nil; }
+        }
 
-	if (sdl_key_down("a")) {
-		px = px - 5;
-	}
+        if (gameOver) {
+            print "Game Over";
+			
+        }
+    }
 
+    sdl_clear(135, 206, 235);
 
-	sdl_clear(hex("0x00"),hex("0x00"),hex("0x00"));
+    // draw obstacles
+    let n = head;
+    while (n != nil) {
+        sdl_fill_rect(n.x, 0, OB_W, n.gapY, 40, 160, 70, 255);
+        sdl_fill_rect(n.x, n.gapY + n.gapH, OB_W,
+                      WINDOW_HEIGHT - (n.gapY + n.gapH), 40, 160, 70, 255);
+        n = n.next;
+    }
 
-	sdl_fill_rect(px, py, pw, ph, 80, 200, 255, 255);
-	
-	sdl_present();
-	sdl_delay(16);
+    // draw player
+    sdl_fill_rect(px, py, pw, ph, 180, 0, 0, 255);
 
+    sdl_present();
+    sdl_delay(16);
 }
 
 sdl_quit();
-
-
