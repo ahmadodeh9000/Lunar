@@ -62,15 +62,17 @@ static Value random_native(int argc, Value* args) {
     int min = AS_NUMBER(args[0]);
     int max = AS_NUMBER(args[1]);
 
+    if (min > max) { int t = min; min = max; max = t; }
 
-    srand(time(0));
-    int rand_val = rand() % (max - min + 1) + min;
+    long long range = (long long) max - min + 1;
+    int rand_val = (int) (rand() % range) + min;
 
     return NUMBER_VAL(rand_val);
 
 }
 
 void register_std_natives() {
+    srand((unsigned) time(NULL));
 
     define_native("clock",clock_native);
     define_native("sqrt",sqrt_native);
