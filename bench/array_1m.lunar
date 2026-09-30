@@ -1,0 +1,5 @@
+let a = [];
+for (let i = 0; i < 1000000; i = i + 1) { push(a, i); }
+let total = 0;
+for (let i = 0; i < len(a); i = i + 1) { total = total + a[i]; }
+print total;

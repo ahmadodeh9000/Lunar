@@ -734,3 +734,21 @@ source (.lunar)
 ## License
 
 MIT
+
+## Benchmarks
+
+<!-- BENCH:START -->
+| Benchmark | Lunar | Lua | Python |
+|---|---|---|---|
+| fib(32) | 0.235 s ± 0.003 | 0.132 s ± 0.004 | 0.263 s ± 0.001 |
+| loop (10M) | 0.362 s ± 0.003 | 0.129 s ± 0.000 | 0.942 s ± 0.113 |
+| array (1M) | 0.095 s ± 0.000 | 0.033 s ± 0.001 | 0.155 s ± 0.008 |
+| method calls (1M) | 0.065 s ± 0.001 | 0.036 s ± 0.001 | 0.087 s ± 0.003 |
+| closures (1M) | 0.052 s ± 0.001 | 0.026 s ± 0.000 | 0.097 s ± 0.003 |
+
+Measured on Apple M1 (Darwin arm64), mean of 5 runs ± stddev, wall-clock time including process startup. Lower is better.
+
+Versions: Lunar (local build), Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio, Python 3.14.7.
+
+Reproduce: `python3 bench.py`
+<!-- BENCH:END -->

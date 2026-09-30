@@ -1,0 +1,9 @@
+fn make() {
+    let n = 0;
+    fn inc() { n = n + 1; ret n; }
+    ret inc;
+}
+let f = make();
+let r = 0;
+for (let i = 0; i < 1000000; i = i + 1) { r = f(); }
+print r;

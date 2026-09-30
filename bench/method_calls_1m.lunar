@@ -1,0 +1,7 @@
+struct Counter {
+    init() { self.n = 0; }
+    inc() { self.n = self.n + 1; }
+}
+let c = Counter();
+for (let i = 0; i < 1000000; i = i + 1) { c.inc(); }
+print c.n;
