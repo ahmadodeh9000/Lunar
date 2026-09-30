@@ -80,7 +80,7 @@ let gameOver = false;
 while (running) {
     let ev = sdl_poll();
 
-    if (ev == "quit" || sdl_key_down("escape")) {
+    if (ev == "quit" || sdl_key_down("escape") ) {
         running = false;
     }
 

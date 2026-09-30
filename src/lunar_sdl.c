@@ -96,24 +96,105 @@ static Value sdl_texture_height_native(i32 argc, Value* args) {
     return NUMBER_VAL((double)h);
 }
 
+/*================================
+  ==========KEYS==================
+  ================================
+*/
+typedef struct {
+    const char*  name;
+    SDL_Scancode code;
+} KeyEntry;
+
+static const KeyEntry KEY_TABLE[] = {
+    // arrows
+    {"up", SDL_SCANCODE_UP}, {"down", SDL_SCANCODE_DOWN},
+    {"left", SDL_SCANCODE_LEFT}, {"right", SDL_SCANCODE_RIGHT},
+
+    // whitespace / editing
+    {"space", SDL_SCANCODE_SPACE}, {"enter", SDL_SCANCODE_RETURN},
+    {"return", SDL_SCANCODE_RETURN}, {"escape", SDL_SCANCODE_ESCAPE},
+    {"tab", SDL_SCANCODE_TAB}, {"backspace", SDL_SCANCODE_BACKSPACE},
+    {"delete", SDL_SCANCODE_DELETE}, {"insert", SDL_SCANCODE_INSERT},
+
+    // navigation
+    {"home", SDL_SCANCODE_HOME}, {"end", SDL_SCANCODE_END},
+    {"pageup", SDL_SCANCODE_PAGEUP}, {"pagedown", SDL_SCANCODE_PAGEDOWN},
+
+    // modifiers
+    {"shift", SDL_SCANCODE_LSHIFT}, {"lshift", SDL_SCANCODE_LSHIFT},
+    {"rshift", SDL_SCANCODE_RSHIFT},
+    {"ctrl", SDL_SCANCODE_LCTRL}, {"lctrl", SDL_SCANCODE_LCTRL},
+    {"rctrl", SDL_SCANCODE_RCTRL},
+    {"alt", SDL_SCANCODE_LALT}, {"lalt", SDL_SCANCODE_LALT},
+    {"ralt", SDL_SCANCODE_RALT},
+    {"gui", SDL_SCANCODE_LGUI}, {"lgui", SDL_SCANCODE_LGUI},
+    {"rgui", SDL_SCANCODE_RGUI},
+    {"capslock", SDL_SCANCODE_CAPSLOCK},
+
+    // punctuation
+    {"minus", SDL_SCANCODE_MINUS}, {"equals", SDL_SCANCODE_EQUALS},
+    {"leftbracket", SDL_SCANCODE_LEFTBRACKET},
+    {"rightbracket", SDL_SCANCODE_RIGHTBRACKET},
+    {"backslash", SDL_SCANCODE_BACKSLASH},
+    {"semicolon", SDL_SCANCODE_SEMICOLON},
+    {"apostrophe", SDL_SCANCODE_APOSTROPHE},
+    {"grave", SDL_SCANCODE_GRAVE}, {"comma", SDL_SCANCODE_COMMA},
+    {"period", SDL_SCANCODE_PERIOD}, {"slash", SDL_SCANCODE_SLASH},
+
+    // keypad
+    {"kp0", SDL_SCANCODE_KP_0}, {"kp1", SDL_SCANCODE_KP_1},
+    {"kp2", SDL_SCANCODE_KP_2}, {"kp3", SDL_SCANCODE_KP_3},
+    {"kp4", SDL_SCANCODE_KP_4}, {"kp5", SDL_SCANCODE_KP_5},
+    {"kp6", SDL_SCANCODE_KP_6}, {"kp7", SDL_SCANCODE_KP_7},
+    {"kp8", SDL_SCANCODE_KP_8}, {"kp9", SDL_SCANCODE_KP_9},
+    {"kpenter", SDL_SCANCODE_KP_ENTER}, {"kpplus", SDL_SCANCODE_KP_PLUS},
+    {"kpminus", SDL_SCANCODE_KP_MINUS},
+    {"kpmultiply", SDL_SCANCODE_KP_MULTIPLY},
+    {"kpdivide", SDL_SCANCODE_KP_DIVIDE},
+    {"kpperiod", SDL_SCANCODE_KP_PERIOD},
+
+    // misc
+    {"printscreen", SDL_SCANCODE_PRINTSCREEN},
+    {"scrolllock", SDL_SCANCODE_SCROLLLOCK},
+    {"pause", SDL_SCANCODE_PAUSE}, {"numlock", SDL_SCANCODE_NUMLOCKCLEAR},
+};
+
+static bool lookup_scancode(const char* key, SDL_Scancode* out) {
+    size_t len = strlen(key);
+
+    // a-z (single letter, case-insensitive)
+    if (len == 1) {
+        char c = key[0];
+        if (c >= 'A' && c <= 'Z') c += 32;
+        if (c >= 'a' && c <= 'z') { *out = SDL_SCANCODE_A + (c - 'a'); return true; }
+        if (c >= '1' && c <= '9') { *out = SDL_SCANCODE_1 + (c - '1'); return true; }
+        if (c == '0')             { *out = SDL_SCANCODE_0; return true; }
+    }
+
+    // f1 - f12
+    if ((key[0] == 'f' || key[0] == 'F') && len >= 2 && len <= 3) {
+        int n = atoi(key + 1);
+        if (n >= 1 && n <= 12) { *out = SDL_SCANCODE_F1 + (n - 1); return true; }
+    }
+
+    // everything else
+    for (size_t i = 0; i < sizeof(KEY_TABLE) / sizeof(KEY_TABLE[0]); i++) {
+        if (strcmp(key, KEY_TABLE[i].name) == 0) {
+            *out = KEY_TABLE[i].code;
+            return true;
+        }
+    }
+    return false;
+}
+
 static Value sdl_key_down_native(i32 argc, Value* args) {
     if (argc < 1 || !IS_STRING(args[0])) return BOOL_VAL(false);
-    const char* key = AS_CSTRING(args[0]);
-    SDL_Scancode code;
 
-    if      (strcmp(key, "up")     == 0) code = SDL_SCANCODE_UP;
-    else if (strcmp(key, "down")   == 0) code = SDL_SCANCODE_DOWN;
-    else if (strcmp(key, "left")   == 0) code = SDL_SCANCODE_LEFT;
-    else if (strcmp(key, "right")  == 0) code = SDL_SCANCODE_RIGHT;
-    else if (strcmp(key, "space")  == 0) code = SDL_SCANCODE_SPACE;
-    else if (strcmp(key, "escape") == 0) code = SDL_SCANCODE_ESCAPE;
-    else if (strcmp(key, "w")      == 0) code = SDL_SCANCODE_W;
-    else if (strcmp(key, "a")      == 0) code = SDL_SCANCODE_A;
-    else if (strcmp(key, "s")      == 0) code = SDL_SCANCODE_S;
-    else if (strcmp(key, "d")      == 0) code = SDL_SCANCODE_D;
-    else return BOOL_VAL(false);
+    SDL_Scancode code;
+    if (!lookup_scancode(AS_CSTRING(args[0]), &code)) return BOOL_VAL(false);
 
     SDL_PumpEvents();
+    const Uint8* keyboard = SDL_GetKeyboardState(NULL);
     return BOOL_VAL(keyboard[code] != 0);
 }
 
