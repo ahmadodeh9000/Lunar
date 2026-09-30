@@ -151,6 +151,10 @@ Token scan_token() {
         case '-': return make_token(TOKEN_MINUS);
         case '/': return make_token(TOKEN_SLASH);
         case '%': return make_token(TOKEN_PERCENT);
+
+        case '[': return make_token(TOKEN_LEFT_BRACKET);
+        case ']': return make_token(TOKEN_RIGHT_BRACKET);
+        
         case '"': return string();
         case '!': return make_token(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
         case '*': return make_token(match('*') ? TOKEN_STAR_STAR  : TOKEN_STAR);

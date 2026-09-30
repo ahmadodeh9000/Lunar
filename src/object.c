@@ -36,7 +36,7 @@ static u32 hash_string(const char* key, int length) {
     }
     return hash;
 }
-
+/*
 static ObjString* allocate_string(char* chars, int length, u32 hash) {
     ObjString* string   = ALLOCATE_OBJ(ObjString, OBJ_STRING);
     string->length      = length;
@@ -44,6 +44,17 @@ static ObjString* allocate_string(char* chars, int length, u32 hash) {
     string->hash        = hash;
     // intern the string
     table_set(&lvm.strings, string, NIL_VAL);
+    return string;
+}
+*/
+static ObjString* allocate_string(char* chars, int length, u32 hash) {
+    ObjString* string   = ALLOCATE_OBJ(ObjString, OBJ_STRING);
+    string->length      = length;
+    string->chars       = chars;
+    string->hash        = hash;
+    push(OBJ_VAL(string));                          // add: root it during the insert
+    table_set(&lvm.strings, string, NIL_VAL);
+    pop();                                          // add
     return string;
 }
 
@@ -128,6 +139,12 @@ ObjBoundMethod* new_bound_method(Value receiver, ObjClosure* method) {
     return bm;
 }
 
+ObjArray* new_array() {
+    ObjArray* array = ALLOCATE_OBJ(ObjArray, OBJ_ARRAY);
+    init_value_array(&array->items);
+    return array;
+}
+
 ObjFFILib* new_ffi_lib(ObjString* path, void* handle) {
     ObjFFILib* lib = ALLOCATE_OBJ(ObjFFILib, OBJ_FFI_LIB);
     lib->path = path;
@@ -189,5 +206,18 @@ void printObject(Value value) {
         case OBJ_FFI_FUNC:
             printf("<ffi native fn '%s'>", AS_FFI_FUNC(value)->name->chars);
             break;
+
+
+        case OBJ_ARRAY: {
+            ObjArray* a = AS_ARRAY(value);
+            printf("[");
+            for (int i = 0; i < a->items.count; i++) {
+                if (i > 0) printf(", ");
+                printValue(a->items.values[i]);
+            }
+            printf("]");
+            break;
+        }
+
     }
 }

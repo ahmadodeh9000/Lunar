@@ -22,6 +22,7 @@ typedef enum {
     OBJ_CLOSURE,
     OBJ_UPVALUE,
     OBJ_STRUCT,
+    OBJ_ARRAY,
     OBJ_INSTANCE,
     OBJ_BOUND_METHOD,
     OBJ_FFI_LIB, 
@@ -33,6 +34,12 @@ struct Obj {
     bool is_marked;         // GC mark bit
     struct Obj* next;
 };
+
+/*-- Array --*/
+typedef struct {
+    Obj obj;
+    ValueArray items;
+} ObjArray;
 
 /* ── String ── */
 struct ObjString {
@@ -147,6 +154,8 @@ static inline bool is_obj_type(Value value, ObjType type) {
 #define AS_BOUND_METHOD(value)  ((ObjBoundMethod*)AS_OBJ(value))
 #define AS_FFI_LIB(value)       ((ObjFFILib*)AS_OBJ(value))       // FFI
 #define AS_FFI_FUNC(value)      ((ObjFFIFunc*)AS_OBJ(value))      // FFI
+#define IS_ARRAY(value)  is_obj_type(value, OBJ_ARRAY)            // ARRAY 
+#define AS_ARRAY(value)  ((ObjArray*)AS_OBJ(value))               // ARRAY
 
 
 ObjString*      copy_str(const char* chars, int length);
@@ -160,6 +169,7 @@ ObjInstance*    new_instance(ObjStruct* klass);
 ObjBoundMethod* new_bound_method(Value receiver, ObjClosure* method);
 ObjFFILib* new_ffi_lib(ObjString* path, void* handle);      // FFI
 ObjFFIFunc* new_ffi_func(ObjString* name, void* symbol);    // FFI
+ObjArray* new_array();                                      // array
 
 
 void printObject(Value value);

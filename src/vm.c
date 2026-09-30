@@ -313,6 +313,62 @@ static InterpretResult run() {
                 }
                 break;
             }
+            case OP_BUILD_ARRAY: {
+                int n = READ_BYTE();
+                ObjArray* array = new_array();
+                push(OBJ_VAL(array));                 // root it: write_value_array can trigger GC
+                for (int i = 0; i < n; i++) {
+                    write_value_array(&array->items, peek(n - i));  // peek(n) = first element
+                }
+                Value result = pop();                 // the array
+                lvm.stack_top -= n;                   // drop the elements
+                push(result);
+                break;
+            }
+
+            case OP_GET_INDEX: {
+                if (!IS_ARRAY(peek(1))) {
+                    runtime_error("Only arrays can be indexed.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
+                if (!IS_NUMBER(peek(0))) {
+                    runtime_error("Array index must be a number.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
+                ObjArray* array = AS_ARRAY(peek(1));
+                double d = AS_NUMBER(peek(0));
+                if (d != floor(d) || d < 0 || d >= array->items.count) {
+                    runtime_error("Array index %g out of bounds (length %d).", d, array->items.count);
+                    return INTERPRET_RUNTIME_ERR;
+                }
+                Value v = array->items.values[(i32)d];
+                pop(); pop();
+                push(v);
+                break;
+            }
+            
+            case OP_SET_INDEX: {
+                if (!IS_ARRAY(peek(2))) {
+                    runtime_error("Only arrays can be indexed.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
+                if (!IS_NUMBER(peek(1))) {
+                    runtime_error("Array index must be a number.");
+                    return INTERPRET_RUNTIME_ERR;
+                }
+                ObjArray* array = AS_ARRAY(peek(2));
+                double d = AS_NUMBER(peek(1));
+                if (d != floor(d) || d < 0 || d >= array->items.count) {
+                    runtime_error("Array index %g out of bounds (length %d).", d, array->items.count);
+                    return INTERPRET_RUNTIME_ERR;
+                }
+                array->items.values[(i32)d] = peek(0);
+                Value v = pop();
+                pop(); pop();
+                push(v);                              // assignment is an expression
+                break;
+            }
+
             case OP_CALL: {
                 int argc=READ_BYTE();
                 if(!call_value(peek(argc),argc)) return INTERPRET_RUNTIME_ERR;

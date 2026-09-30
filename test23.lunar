@@ -1,0 +1,31 @@
+let a = [4,2,1,7];
+
+
+fn sort(a) {
+    for (let i = 0; i < 4; i = i + 1) {
+        for (let j = 0; j < 4; j = j+ 1) {
+            if (a[i] > a[j]) {
+                a[i] = a[i] ^ a[j];
+                a[j] = a[j] ^ a[i];
+                a[i] = a[i] ^ a[j];
+            }
+            
+
+        }
+    }
+    ret a;
+}
+
+
+fn neg(a) {
+    for (let i = 0; i < 4; i = i + 1) {
+	a[i] = -a[i];
+    }
+
+    ret a;
+}
+
+
+
+print(a);
+print(neg(sort(neg(a))));

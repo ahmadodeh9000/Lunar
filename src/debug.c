@@ -112,6 +112,9 @@ i32 disassemble_instruction(Chunk* chunk, i32 offset) {
         case OP_INHERIT:            return simple_instruction("OP_INHERIT", offset);
         case OP_GET_SUPER:          return constant_instruction("OP_GET_SUPER", chunk, offset);
         case OP_SUPER_INVOKE:       return invoke_instruction("OP_SUPER_INVOKE", chunk, offset);
+        case OP_BUILD_ARRAY:        return byte_instruction("OP_BUILD_ARRAY", chunk, offset);
+        case OP_GET_INDEX:          return simple_instruction("OP_GET_INDEX", offset);
+        case OP_SET_INDEX:          return simple_instruction("OP_SET_INDEX", offset);
         default:
             printf("Unknown opcode %d\n", instr);
             return offset + 1;

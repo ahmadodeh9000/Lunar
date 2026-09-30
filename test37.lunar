@@ -1,0 +1,3 @@
+let big = [];
+for (let i = 0; i < 20000; i = i + 1) { big = [i, [i], "s"]; }
+print big[1][0];   // expect 19999

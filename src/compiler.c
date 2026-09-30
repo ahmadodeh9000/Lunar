@@ -197,8 +197,20 @@ static void emit_return() {
     emit_byte(OP_RET);
 }
 
+/*
 static u8 make_const(Value val) {
     int c = add_constant(current_chunk(), val);
+    if (c > UINT8_MAX) { error("Too many constants in one chunk."); return 0; }
+    return (u8)c;
+}
+*/
+
+static u8 make_const(Value val) {
+    Chunk* chunk = current_chunk();
+    for (int i = 0; i < chunk->constants.count; i++) {
+        if (values_equ(chunk->constants.values[i], val)) return (u8)i;
+    }
+    int c = add_constant(chunk, val);
     if (c > UINT8_MAX) { error("Too many constants in one chunk."); return 0; }
     return (u8)c;
 }
@@ -493,6 +505,33 @@ static void dot(bool can_assign) {
     }
 }
 
+static void array_literal(bool can_assign) {
+    int count = 0;
+    if (!check(TOKEN_RIGHT_BRACKET)) {
+        do {
+            if (check(TOKEN_RIGHT_BRACKET)) break;   // this is a feature btw (if u hate it just remove it twin...)
+            expression();
+            if (count == 255) error("Can't have more than 255 array elements.");
+            count++;
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array elements.");
+    emit_bytes(OP_BUILD_ARRAY, (u8)count);
+}
+
+
+static void subscript(bool can_assign) {
+    expression();
+    consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index.");
+
+    if (can_assign && match(TOKEN_EQUAL)) {
+        expression();
+        emit_byte(OP_SET_INDEX);
+    } else {
+        emit_byte(OP_GET_INDEX);
+    }
+}
+
 static void and_(bool can_assign) {
     int end_jump = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
@@ -602,6 +641,8 @@ ParseRule rules[] = {
     [TOKEN_GREATER_EQUAL]       = {NULL,       binary,  PREC_COMPARISON},
     [TOKEN_LESS]                = {NULL,       binary,  PREC_COMPARISON},
     [TOKEN_LESS_EQUAL]          = {NULL,       binary,  PREC_COMPARISON},
+    [TOKEN_LEFT_BRACKET]        = {array_literal, subscript, PREC_CALL},
+    [TOKEN_RIGHT_BRACKET]       = {NULL,          NULL,      PREC_NONE},
     [TOKEN_IDENTIFIER]          = {variable,   NULL,    PREC_NONE},
     [TOKEN_STRING]              = {string_,    NULL,    PREC_NONE},
     [TOKEN_NUMBER]              = {number,     NULL,    PREC_NONE},

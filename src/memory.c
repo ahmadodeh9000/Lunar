@@ -166,6 +166,12 @@ static void blacken_object(Obj* object) {
             break;
         }
 
+        case OBJ_ARRAY: {
+            ObjArray* array = (ObjArray*)object;
+            mark_array(&array->items);
+            break;
+        }
+
         case OBJ_NATIVE:
         case OBJ_STRING:
             break; // no outgoing references
@@ -290,6 +296,14 @@ void freeObject(Obj* object) {
             FREE(ObjInstance, object);
             break;
         }
+
+        case OBJ_ARRAY: {
+            ObjArray* array = (ObjArray*)object;
+            free_value_array(&array->items);
+            FREE(ObjArray, object);
+            break;
+        }
+
         case OBJ_BOUND_METHOD:
             FREE(ObjBoundMethod, object);
             break;

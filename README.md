@@ -23,6 +23,7 @@ d.speak();
 - **Garbage collected** — tri-color mark-and-sweep GC with a gray stack
 - **First-class functions & closures** — functions capture variables by reference across scopes
 - **Structs & single inheritance** — `self`, `super`, bound methods, dynamic fields
+- **Arrays** — literals, nested arrays, indexing and index assignment, `push` / `pop` / `len`
 - **String interning** — strings deduplicated via FNV-1a hash table, pointer equality comparison
 - **Bitwise operators** — `&` `|` `^` `~` `<<` `>>`
 - **Foreign Function Interface** — call into native shared libraries via `libffi`
@@ -99,16 +100,17 @@ x = 20;
 
 ### Types
 
-| Type     | Example          | Notes                       |
-|----------|------------------|-----------------------------|
-| Number   | `3.14`, `42`     | 64-bit IEEE 754 double      |
-| Bool     | `true`, `false`  |                             |
-| Nil      | `nil`            | Absence of a value          |
-| String   | `"hello"`        | UTF-8, multi-line supported |
-| Function | `fn f() { ... }` | First-class closure         |
-| Instance | `Point(x, y)`    | Instance of a struct        |
+| Type     | Example          | Notes                                          |
+|----------|------------------|------------------------------------------------|
+| Number   | `3.14`, `42`     | 64-bit IEEE 754 double                         |
+| Bool     | `true`, `false`  |                                                |
+| Nil      | `nil`            | Absence of a value                             |
+| String   | `"hello"`        | UTF-8, multi-line supported                    |
+| Array    | `[1, "a", nil]`  | Heap-allocated, mixed types, reference semantics |
+| Function | `fn f() { ... }` | First-class closure                            |
+| Instance | `Point(x, y)`    | Instance of a struct                           |
 
-`nil` and `false` are falsey. Everything else is truthy.
+`nil` and `false` are falsey. Everything else is truthy, including empty arrays.
 
 ---
 
@@ -165,6 +167,94 @@ let poem = "line one
 line two
 line three";
 ```
+
+---
+
+### Arrays
+
+Arrays are ordered, zero-indexed, and can hold any mix of values, including other arrays.
+
+```lunar
+let empty  = [];
+let nums   = [10, 20, 30];
+let mixed  = [1, "two", nil, true, [5, 6]];
+let padded = [1, 2, 3,];           // trailing comma is fine
+```
+
+**Indexing and assignment**
+
+```lunar
+print nums[0];          // 10
+print nums[1 + 1];      // 30
+
+nums[0] = 99;
+print nums;             // [99, 20, 30]
+
+// assignment is an expression
+nums[0] = nums[1] = 7;
+print nums;             // [7, 7, 30]
+```
+
+**Nesting**
+
+```lunar
+let grid = [[1, 2], [3, 4]];
+print grid[1][0];       // 3
+grid[0][1] = 20;
+print grid;             // [[1, 20], [3, 4]]
+```
+
+**Growing and shrinking**
+
+```lunar
+let stack = [];
+push(stack, 1);
+push(stack, 2);
+print stack;            // [1, 2]
+print pop(stack);       // 2
+print len(stack);       // 1
+```
+
+**Iterating**
+
+```lunar
+let total = 0;
+let xs = [5, 10, 15];
+for (let i = 0; i < len(xs); i = i + 1) {
+    total = total + xs[i];
+}
+print total;            // 30
+```
+
+Arrays work with functions, closures, and struct fields like any other value:
+
+```lunar
+fn map(arr, f) {
+    let out = [];
+    for (let i = 0; i < len(arr); i = i + 1) {
+        push(out, f(arr[i]));
+    }
+    ret out;
+}
+
+fn square(n) { ret n * n; }
+print map([1, 2, 3], square);   // [1, 4, 9]
+```
+
+**Rules and behavior**
+
+- **Reference semantics.** Assigning or passing an array shares it; mutations are visible through every reference.
+  ```lunar
+  let a = [1, 2];
+  let b = a;
+  b[0] = 100;
+  print a;              // [100, 2]
+  ```
+- **Equality is by reference.** `[1] == [1]` is `false`; `a == b` above is `true`.
+- **Indexes must be whole numbers within bounds.** `a[-1]`, `a[1.5]`, and `a[len(a)]` are runtime errors. Setting an index never grows the array; use `push`.
+- **Only arrays can be indexed.** Indexing anything else is a runtime error, as is a non-number index.
+- **A literal holds at most 255 elements.** Build larger arrays with `push`.
+- **Printing.** `print` shows elements in brackets, with strings unquoted: `[1, a, nil]`.
 
 ---
 
@@ -288,6 +378,21 @@ print a.distance_to(b);  // 5
 - Fields are set via `self.field` and can be added at any time
 - Methods can be retrieved as bound values: `let f = a.show; f();`
 
+Fields can hold arrays:
+
+```lunar
+struct Stack {
+    init() { self.items = []; }
+    push(v) { push(self.items, v); }
+    top()   { ret self.items[len(self.items) - 1]; }
+}
+
+let s = Stack();
+s.push(1);
+s.push(2);
+print s.top();            // 2
+```
+
 ---
 
 ### Inheritance
@@ -341,17 +446,22 @@ print factorial(10);   // 3628800
 
 ## Built-in Functions
 
-| Function      | Signature           | Description                         |
-|---------------|---------------------|--------------------------------------|
-| `print`       | `print x`           | Print value with newline            |
-| `clock()`     | `() → number`       | Seconds since program start         |
-| `sqrt(x)`     | `(number) → number` | Square root                         |
-| `abs(x)`      | `(number) → number` | Absolute value                      |
-| `floor(x)`    | `(number) → number` | Round toward negative infinity      |
-| `ceil(x)`     | `(number) → number` | Round toward positive infinity      |
-| `str(x)`      | `(any) → string`    | Convert any value to string         |
-| `len(s)`      | `(string) → number` | String length in bytes              |
-| `random(x,y)` | `(r1,r2) → number`  | Random number in [r1,r2]            |
+| Function      | Signature                  | Description                                              |
+|---------------|----------------------------|----------------------------------------------------------|
+| `print`       | `print x`                  | Print value with newline                                 |
+| `clock()`     | `() → number`              | Seconds since program start                              |
+| `sqrt(x)`     | `(number) → number`        | Square root                                              |
+| `abs(x)`      | `(number) → number`        | Absolute value                                           |
+| `floor(x)`    | `(number) → number`        | Round toward negative infinity                           |
+| `ceil(x)`     | `(number) → number`        | Round toward positive infinity                           |
+| `str(x)`      | `(value) → string`         | Convert a number, bool, nil, string, or array to a string |
+| `len(x)`      | `(string \| array) → number` | String length in bytes, or number of array elements    |
+| `push(a, v)`  | `(array, any) → array`     | Append `v` to `a`; returns the array, so calls chain     |
+| `pop(a)`      | `(array) → any`            | Remove and return the last element; `nil` if empty       |
+| `hex(s)`      | `(string) → number`        | Parse a hexadecimal string                               |
+| `random(x,y)` | `(r1,r2) → number`         | Random integer in [r1,r2]                                |
+
+Built-ins called with the wrong argument types return `nil` rather than raising an error.
 
 ---
 
@@ -447,6 +557,8 @@ if (mylib) {
     print "Failed to load libcustom.dylib. Make sure the path is correct!";
 }
 ```
+
+Arrays can't be passed to FFI functions yet.
 
 ---
 
@@ -569,6 +681,33 @@ while (running) {
 
 sdl_quit();
 ```
+
+---
+
+## Tests
+
+The array suite lives in `tests/`:
+
+- `arrays_ok.lunar` — every valid-path case; each `print` carries an expected-output marker
+- `arrays_test.sh` — diffs that output against the markers and runs the error cases (bounds, types, syntax, literal size limit), each in its own process
+
+```bash
+./tests/arrays_test.sh ./lunar
+```
+
+For GC stress testing, build with `-DLUNAR_DEBUG_STRESS_GC` (a collection runs on every allocation; slow, but it catches missing GC roots).
+
+---
+
+## Known Limitations
+
+- No `break` / `continue`, no `for x in array`, and no hash maps
+- Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
+- No file or stdin I/O and no module system
+- A runtime error aborts the script; there is no error handling
+- Each function (and the top-level script) can reference at most 256 distinct constants
+- `print` on an array that contains itself recurses without end
+- Arrays can't be passed to FFI functions yet
 
 ---
 
