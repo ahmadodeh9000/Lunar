@@ -789,10 +789,10 @@ source (.lunar)
    Bytecode        array of u8 opcodes, one Chunk per function
        │
        ▼
-   VM              stack-based dispatch loop, call frames, upvalues
+      VM           stack-based dispatch loop, call frames, upvalues
        │
        ▼
-   GC              tri-color mark-and-sweep, triggered by allocation
+      GC           tri-color mark-and-sweep, triggered by allocation
 ```
 
 ---
