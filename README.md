@@ -720,21 +720,6 @@ sdl_quit();
 
 ---
 
-## Tests
-
-The array suite lives in `tests/`:
-
-- `arrays_ok.lunar`: every valid-path case; each `print` carries an expected-output marker
-- `arrays_test.sh`: diffs that output against the markers and runs the error cases (bounds, types, syntax, literal size limit), each in its own process
-
-```bash
-./tests/arrays_test.sh ./lunar
-```
-
-For GC stress testing, build with `-DLUNAR_DEBUG_STRESS_GC` (a collection runs on every allocation; slow, but it catches missing GC roots).
-
----
-
 ## Benchmarks
 
 <!-- BENCH:START -->
