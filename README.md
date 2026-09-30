@@ -1,9 +1,16 @@
 # Lunar
 
-A fast, dynamically-typed scripting language with a bytecode VM, written in C from scratch.  
-Influenced by Lua and JavaScript. Built following [Crafting Interpreters](https://craftinginterpreters.com/) Part II with extensions.
+A dynamically-typed scripting language with a bytecode VM, written in C from scratch.
+Influenced by Lua and JavaScript. Built following [Crafting Interpreters](https://craftinginterpreters.com/) Part II, with extensions.
+
+Faster than CPython 3.14 and roughly 2-3x slower than Lua 5.4 on microbenchmarks ([details](#benchmarks)).
 
 ```lunar
+struct Animal {
+    init(name) { self.name = name; }
+    speak()    { print self.name; }
+}
+
 struct Dog < Animal {
     speak() {
         print "Woof!";
@@ -19,15 +26,15 @@ d.speak();
 
 ## Features
 
-- **Bytecode compiled** — source compiles to compact bytecode executed by a stack-based VM
-- **Garbage collected** — tri-color mark-and-sweep GC with a gray stack
-- **First-class functions & closures** — functions capture variables by reference across scopes
-- **Structs & single inheritance** — `self`, `super`, bound methods, dynamic fields
-- **Arrays** — literals, nested arrays, indexing and index assignment, `push` / `pop` / `len`
-- **String interning** — strings deduplicated via FNV-1a hash table, pointer equality comparison
-- **Bitwise operators** — `&` `|` `^` `~` `<<` `>>`
-- **Foreign Function Interface** — call into native shared libraries via `libffi`
-- **SDL2 support** — optional build target for 2D graphics, textures, and keyboard input
+- **Bytecode compiled**: source compiles to compact bytecode executed by a stack-based VM
+- **Garbage collected**: tri-color mark-and-sweep GC with a gray stack
+- **First-class functions and closures**: functions capture variables by reference across scopes
+- **Structs and single inheritance**: `self`, `super`, bound methods, dynamic fields
+- **Arrays**: literals, nested arrays, indexing and index assignment, `push` / `pop` / `len`
+- **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
+- **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
+- **Foreign Function Interface**: call into native shared libraries via `libffi`
+- **SDL2 support**: optional build target for 2D graphics, textures, and keyboard input
 
 ---
 
@@ -37,6 +44,7 @@ d.speak();
 
 - GCC or Clang
 - Make
+- `libffi`
 
 ### Standard build
 
@@ -90,7 +98,7 @@ let flag  = true;
 let empty = nil;
 ```
 
-Variables are block-scoped inside `{ }`, global otherwise. Reassign without `let`:
+Variables are block-scoped inside `{ }`, and global otherwise. Reassign without `let`:
 
 ```lunar
 x = 20;
@@ -100,15 +108,15 @@ x = 20;
 
 ### Types
 
-| Type     | Example          | Notes                                          |
-|----------|------------------|------------------------------------------------|
-| Number   | `3.14`, `42`     | 64-bit IEEE 754 double                         |
-| Bool     | `true`, `false`  |                                                |
-| Nil      | `nil`            | Absence of a value                             |
-| String   | `"hello"`        | UTF-8, multi-line supported                    |
+| Type     | Example          | Notes                                            |
+|----------|------------------|--------------------------------------------------|
+| Number   | `3.14`, `42`     | 64-bit IEEE 754 double                           |
+| Bool     | `true`, `false`  |                                                  |
+| Nil      | `nil`            | Absence of a value                               |
+| String   | `"hello"`        | UTF-8, multi-line supported                      |
 | Array    | `[1, "a", nil]`  | Heap-allocated, mixed types, reference semantics |
-| Function | `fn f() { ... }` | First-class closure                            |
-| Instance | `Point(x, y)`    | Instance of a struct                           |
+| Function | `fn f() { ... }` | First-class closure                              |
+| Instance | `Point(x, y)`    | Instance of a struct                             |
 
 `nil` and `false` are falsey. Everything else is truthy, including empty arrays.
 
@@ -141,7 +149,7 @@ a || b   // or  (short-circuits)
 !a       // not
 ```
 
-**Bitwise** (truncates to 32-bit int)
+**Bitwise** (operands are truncated to 32-bit integers)
 ```lunar
 5 & 3    // 1   AND
 5 | 3    // 7   OR
@@ -158,7 +166,7 @@ a || b   // or  (short-circuits)
 ```lunar
 let s = "Hello, " + "Lunar!";
 print len(s);      // 13
-print str(42);     // "42"
+print str(42);     // 42
 ```
 
 Multi-line:
@@ -305,13 +313,13 @@ fn double(n)   { ret n * 2; }
 print apply(double, 5);   // 10
 ```
 
-No explicit `ret` returns `nil`.
+A function with no explicit `ret` returns `nil`.
 
 ---
 
 ### Closures
 
-Functions capture variables from their enclosing scope. Mutations are shared:
+Functions capture variables from their enclosing scope, and mutations are shared:
 
 ```lunar
 fn make_counter() {
@@ -373,7 +381,7 @@ a.show();                 // (0, 0)
 print a.distance_to(b);  // 5
 ```
 
-- `init` is the constructor — called automatically on `StructName(...)`
+- `init` is the constructor, called automatically on `StructName(...)`
 - `self` refers to the current instance inside any method
 - Fields are set via `self.field` and can be added at any time
 - Methods can be retrieved as bound values: `let f = a.show; f();`
@@ -446,20 +454,20 @@ print factorial(10);   // 3628800
 
 ## Built-in Functions
 
-| Function      | Signature                  | Description                                              |
-|---------------|----------------------------|----------------------------------------------------------|
-| `print`       | `print x`                  | Print value with newline                                 |
-| `clock()`     | `() → number`              | Seconds since program start                              |
-| `sqrt(x)`     | `(number) → number`        | Square root                                              |
-| `abs(x)`      | `(number) → number`        | Absolute value                                           |
-| `floor(x)`    | `(number) → number`        | Round toward negative infinity                           |
-| `ceil(x)`     | `(number) → number`        | Round toward positive infinity                           |
-| `str(x)`      | `(value) → string`         | Convert a number, bool, nil, string, or array to a string |
-| `len(x)`      | `(string \| array) → number` | String length in bytes, or number of array elements    |
-| `push(a, v)`  | `(array, any) → array`     | Append `v` to `a`; returns the array, so calls chain     |
-| `pop(a)`      | `(array) → any`            | Remove and return the last element; `nil` if empty       |
-| `hex(s)`      | `(string) → number`        | Parse a hexadecimal string                               |
-| `random(x,y)` | `(r1,r2) → number`         | Random integer in [r1,r2]                                |
+| Function      | Signature                    | Description                                               |
+|---------------|------------------------------|-----------------------------------------------------------|
+| `print`       | `print x`                    | Print a value followed by a newline                       |
+| `clock()`     | `() → number`                | Seconds since program start                               |
+| `sqrt(x)`     | `(number) → number`          | Square root                                               |
+| `abs(x)`      | `(number) → number`          | Absolute value                                            |
+| `floor(x)`    | `(number) → number`          | Round toward negative infinity                            |
+| `ceil(x)`     | `(number) → number`          | Round toward positive infinity                            |
+| `str(x)`      | `(value) → string`           | Convert a number, bool, nil, string, or array to a string |
+| `len(x)`      | `(string \| array) → number` | String length in bytes, or number of array elements       |
+| `push(a, v)`  | `(array, any) → array`       | Append `v` to `a`; returns the array, so calls chain      |
+| `pop(a)`      | `(array) → any`              | Remove and return the last element; `nil` if empty        |
+| `hex(s)`      | `(string) → number`          | Parse a hexadecimal string                                |
+| `random(x,y)` | `(number, number) → number`  | Random integer in the range `[x, y]`                      |
 
 Built-ins called with the wrong argument types return `nil` rather than raising an error.
 
@@ -467,32 +475,29 @@ Built-ins called with the wrong argument types return `nil` rather than raising 
 
 ## Foreign Function Interface (FFI)
 
-Lunar features a powerful, zero-boilerplate FFI powered by `libffi`. This allows you to load native system binaries or your own custom compiled C code dynamically at runtime, marshaling values automatically across the language boundary.
+Lunar has a zero-boilerplate FFI built on `libffi`. You can load system libraries or your own compiled C code at runtime, and values are marshaled across the language boundary automatically.
 
-### Core Lifecycle
+### Core functions
 
 ```lunar
-clib(path)              // Loads a shared library handle (.dylib, .so, .dll)
-                        // Note: Pass an empty string "" on macOS/Linux to look up system symbols
+clib(path)              // Loads a shared library and returns a handle (.dylib, .so, .dll).
+                        // Pass "" to look up symbols already in the current process (libc, etc.).
 
 cbind(lib, name, ret_type, param1, param2, ...)
-                        // Binds a native symbol and returns a callable closure
+                        // Binds a native symbol and returns a callable closure.
+                        // Returns nil if the symbol can't be found.
 ```
 
-Example — calling a system function:
+### Example: calling a system function
 
 ```lunar
-// On macOS, passing an empty string to clib searches the current process
 let libc = clib("");
 
 if (libc) {
-    print "Successfully loaded system library!";
-
     let c_puts = cbind(libc, "puts", "int", "string");
 
     if (c_puts) {
-        print "Successfully bound 'puts' from C!";
-        c_puts("Hello safely from the Lunar FFI pipeline!");
+        c_puts("Hello from C via the Lunar FFI!");
     } else {
         print "Failed to bind 'puts'.";
     }
@@ -501,16 +506,16 @@ if (libc) {
 }
 ```
 
-Example — calling your own compiled C code:
+### Example: calling your own C code
 
 ```c
-// test_ffi.c
+// mylib.c
 #include <stdio.h>
 
-// We use attribute((visibility("default"))) to ensure macOS exports the symbol
+// Make sure the symbols are exported from the shared library.
 __attribute__((visibility("default")))
-void greet_ahmad(const char* greeting) {
-    printf("%s, Ahmad!\n", greeting);
+void greet(const char *greeting) {
+    printf("%s, Lunar!\n", greeting);
 }
 
 __attribute__((visibility("default")))
@@ -519,42 +524,29 @@ int add_numbers(int a, int b) {
 }
 ```
 
+Compile it as a shared library:
+
 ```bash
-gcc -dynamiclib -o libcustom.dylib test_ffi.c
+# macOS
+gcc -dynamiclib -o libmylib.dylib mylib.c
+
+# Linux
+gcc -shared -fPIC -o libmylib.so mylib.c
 ```
 
+Then call it from Lunar (use the `.so` path on Linux):
+
 ```lunar
-// Load our local custom library by passing its relative path
-let mylib = clib("./libcustom.dylib");
+let mylib = clib("./libmylib.dylib");
 
 if (mylib) {
-    print "Successfully loaded libcustom.dylib!";
+    let greet = cbind(mylib, "greet", "void", "string");
+    let add   = cbind(mylib, "add_numbers", "int", "int", "int");
 
-    // 1. Bind our custom greeting function: void greet_ahmad(const char* greeting)
-    let greet = cbind(mylib, "greet_ahmad", "void", "string");
-
-    if (greet) {
-        print "Calling greet_ahmad via FFI...";
-        greet("Welcome back"); // Should print: Welcome back, Ahmad!
-    } else {
-        print "Failed to bind greet_ahmad.";
-    }
-
-    print "---------------------------------------";
-
-    // 2. Bind our custom math function: int add_numbers(int a, int b)
-    let add = cbind(mylib, "add_numbers", "int", "int", "int");
-
-    if (add) {
-        print "Calling add_numbers(15, 27)...";
-        let sum = add(15, 27);
-        print "Result from custom C library:";
-        print sum; // Should print 42
-    } else {
-        print "Failed to bind add_numbers.";
-    }
+    if (greet) { greet("Hello"); }       // Hello, Lunar!
+    if (add)   { print add(15, 27); }    // 42
 } else {
-    print "Failed to load libcustom.dylib. Make sure the path is correct!";
+    print "Failed to load the library. Check the path.";
 }
 ```
 
@@ -573,7 +565,7 @@ sdl_init("Title", 800, 600);   // open window + renderer, init SDL_image
 sdl_quit();                     // destroy window, free textures, quit SDL
 ```
 
-### Game Loop Pattern
+### Game loop pattern
 
 ```lunar
 sdl_init("My Game", 800, 600);
@@ -595,7 +587,7 @@ sdl_quit();
 ### Drawing
 
 ```lunar
-sdl_clear(r, g, b)                     // clear screen with color
+sdl_clear(r, g, b)                     // clear screen with a color
 sdl_fill_rect(x, y, w, h, r, g, b, a)  // filled rectangle
 sdl_present()                          // flip buffer to screen
 ```
@@ -605,20 +597,20 @@ sdl_present()                          // flip buffer to screen
 Textures are referenced by an integer handle returned from `sdl_load_texture`.
 
 ```lunar
-let tex = sdl_load_texture("player.png");  // returns handle, or -1 on failure
-sdl_draw_texture(tex, x, y, w, h);         // draw scaled into a dest rect
+let tex = sdl_load_texture("player.png");  // returns a handle, or -1 on failure
+sdl_draw_texture(tex, x, y, w, h);         // draw scaled into a destination rect
 sdl_texture_width(tex);                    // native pixel width
 sdl_texture_height(tex);                   // native pixel height
 ```
 
-Textures are freed automatically on `sdl_quit()`; there is currently no way to unload a single texture early.
+Textures are freed automatically on `sdl_quit()`. There is currently no way to unload a single texture early.
 
 ### Input
 
 ```lunar
 let e = sdl_poll();      // "quit" | nil
 
-sdl_key_down("left")     // true if key currently held
+sdl_key_down("left")     // true if the key is currently held
                          // keys: "up" "down" "left" "right"
                          //       "space" "escape" "w" "a" "s" "d"
 ```
@@ -626,12 +618,14 @@ sdl_key_down("left")     // true if key currently held
 ### Timing
 
 ```lunar
-sdl_delay(16)  // sleep ms — use in loop for ~60fps cap
+sdl_delay(16)  // sleep in ms; use in the loop for a ~60fps cap
 ```
 
 ---
 
-## Example — Pong
+## Example: Pong
+
+Player on the left (up/down arrows), CPU on the right. First to miss gives the other side a point.
 
 ```lunar
 let W = 800;
@@ -639,11 +633,22 @@ let H = 600;
 
 sdl_init("Pong", W, H);
 
-let PAD_W = 12;   let PAD_H  = 80;
-let p1x   = 20;   let p1y    = H / 2 - PAD_H / 2;
-let p2x   = W - 32; let p2y  = H / 2 - PAD_H / 2;
-let bx    = W / 2;  let by   = H / 2;
-let bvx   = 4;    let bvy    = 3;
+let PAD_W = 12;
+let PAD_H = 80;
+let BALL  = 12;
+
+let p1x = 20;
+let p1y = H / 2 - PAD_H / 2;
+let p2x = W - 32;
+let p2y = H / 2 - PAD_H / 2;
+
+let bx  = W / 2;
+let by  = H / 2;
+let bvx = 4;
+let bvy = 3;
+
+let score1 = 0;
+let score2 = 0;
 
 fn clamp(v, lo, hi) {
     if (v < lo) ret lo;
@@ -656,6 +661,7 @@ while (running) {
     let e = sdl_poll();
     if (e == "quit") { running = false; }
 
+    // player input
     if (sdl_key_down("up"))   { p1y = p1y - 5; }
     if (sdl_key_down("down")) { p1y = p1y + 5; }
     p1y = clamp(p1y, 0, H - PAD_H);
@@ -666,15 +672,45 @@ while (running) {
     if (mid > by) { p2y = p2y - 3; }
     p2y = clamp(p2y, 0, H - PAD_H);
 
+    // move ball
     bx = bx + bvx;
     by = by + bvy;
-    if (by <= 0 || by + 12 >= H) { bvy = -bvy; }
-    if (bx < 0 || bx > W) { bx = W / 2; by = H / 2; }
+
+    // bounce off top and bottom
+    if (by <= 0 || by + BALL >= H) { bvy = -bvy; }
+
+    // bounce off left paddle
+    if (bvx < 0 && bx <= p1x + PAD_W && bx + BALL >= p1x &&
+        by + BALL >= p1y && by <= p1y + PAD_H) {
+        bvx = -bvx;
+        bx = p1x + PAD_W;
+    }
+
+    // bounce off right paddle
+    if (bvx > 0 && bx + BALL >= p2x && bx <= p2x + PAD_W &&
+        by + BALL >= p2y && by <= p2y + PAD_H) {
+        bvx = -bvx;
+        bx = p2x - BALL;
+    }
+
+    // scoring: ball left the screen
+    if (bx < 0) {
+        score2 = score2 + 1;
+        print "Player " + str(score1) + " - CPU " + str(score2);
+        bx = W / 2;
+        by = H / 2;
+    }
+    if (bx > W) {
+        score1 = score1 + 1;
+        print "Player " + str(score1) + " - CPU " + str(score2);
+        bx = W / 2;
+        by = H / 2;
+    }
 
     sdl_clear(15, 15, 25);
     sdl_fill_rect(p1x, p1y, PAD_W, PAD_H, 80,  200, 255, 255);
     sdl_fill_rect(p2x, p2y, PAD_W, PAD_H, 255, 100, 100, 255);
-    sdl_fill_rect(bx,  by,  12,    12,    255, 255, 255, 255);
+    sdl_fill_rect(bx,  by,  BALL,  BALL,  255, 255, 255, 255);
     sdl_present();
     sdl_delay(16);
 }
@@ -688,8 +724,8 @@ sdl_quit();
 
 The array suite lives in `tests/`:
 
-- `arrays_ok.lunar` — every valid-path case; each `print` carries an expected-output marker
-- `arrays_test.sh` — diffs that output against the markers and runs the error cases (bounds, types, syntax, literal size limit), each in its own process
+- `arrays_ok.lunar`: every valid-path case; each `print` carries an expected-output marker
+- `arrays_test.sh`: diffs that output against the markers and runs the error cases (bounds, types, syntax, literal size limit), each in its own process
 
 ```bash
 ./tests/arrays_test.sh ./lunar
@@ -699,11 +735,38 @@ For GC stress testing, build with `-DLUNAR_DEBUG_STRESS_GC` (a collection runs o
 
 ---
 
+## Benchmarks
+
+<!-- BENCH:START -->
+| Benchmark | Lunar | Lua | Python |
+|---|---|---|---|
+| fib(32) | 0.235 s ± 0.003 | 0.132 s ± 0.004 | 0.263 s ± 0.001 |
+| loop (10M) | 0.362 s ± 0.003 | 0.129 s ± 0.000 | 0.942 s ± 0.113 |
+| array (1M) | 0.095 s ± 0.000 | 0.033 s ± 0.001 | 0.155 s ± 0.008 |
+| method calls (1M) | 0.065 s ± 0.001 | 0.036 s ± 0.001 | 0.087 s ± 0.003 |
+| closures (1M) | 0.052 s ± 0.001 | 0.026 s ± 0.000 | 0.097 s ± 0.003 |
+
+Measured on Apple M1 (Darwin arm64), mean of 5 runs ± stddev, wall-clock time including process startup. Lower is better.
+
+Versions: Lunar (local build), Lua 5.4.8, Python 3.14.7.
+
+Reproduce: `python3 bench.py`
+<!-- BENCH:END -->
+
+Notes:
+
+- These are microbenchmarks, so treat the ratios as a rough guide, not a precise measurement.
+- Run times include process startup, which matters most for the shortest benchmarks.
+- The Lunar loop and array programs use top-level (global) variables, which are hash-table lookups in the VM. The Lua versions use locals, and Lua 5.4 also has a native integer type, so part of the gap to Lua comes from how the programs are written.
+- The benchmark programs are generated into `bench/` by `bench.py`.
+
+---
+
 ## Known Limitations
 
 - No `break` / `continue`, no `for x in array`, and no hash maps
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
-- No file or stdin I/O and no module system
+- No file or stdin I/O, and no module system
 - A runtime error aborts the script; there is no error handling
 - Each function (and the top-level script) can reference at most 256 distinct constants
 - `print` on an array that contains itself recurses without end
@@ -723,32 +786,17 @@ source (.lunar)
    Compiler        Pratt parser → emits bytecode + constant pool
        │
        ▼
-   Bytecode         array of u8 opcodes, one Chunk per function
+   Bytecode        array of u8 opcodes, one Chunk per function
        │
        ▼
-   VM               stack-based dispatch loop, call frames, upvalues
+   VM              stack-based dispatch loop, call frames, upvalues
        │
        ▼
-   GC               tri-color mark-and-sweep, triggered by allocation
+   GC              tri-color mark-and-sweep, triggered by allocation
 ```
+
+---
+
 ## License
 
 MIT
-
-## Benchmarks
-
-<!-- BENCH:START -->
-| Benchmark | Lunar | Lua | Python |
-|---|---|---|---|
-| fib(32) | 0.235 s ± 0.003 | 0.132 s ± 0.004 | 0.263 s ± 0.001 |
-| loop (10M) | 0.362 s ± 0.003 | 0.129 s ± 0.000 | 0.942 s ± 0.113 |
-| array (1M) | 0.095 s ± 0.000 | 0.033 s ± 0.001 | 0.155 s ± 0.008 |
-| method calls (1M) | 0.065 s ± 0.001 | 0.036 s ± 0.001 | 0.087 s ± 0.003 |
-| closures (1M) | 0.052 s ± 0.001 | 0.026 s ± 0.000 | 0.097 s ± 0.003 |
-
-Measured on Apple M1 (Darwin arm64), mean of 5 runs ± stddev, wall-clock time including process startup. Lower is better.
-
-Versions: Lunar (local build), Lua 5.4.8  Copyright (C) 1994-2025 Lua.org, PUC-Rio, Python 3.14.7.
-
-Reproduce: `python3 bench.py`
-<!-- BENCH:END -->
