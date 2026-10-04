@@ -1,0 +1,456 @@
+// particles.lunar  --  2D particle engine for Lunar (rename this file to .lunar)
+//
+// Build Lunar with SDL2 first:   make sdl
+// Run:                           ./lunar particles.lunar
+//
+// CONTROLS
+//   arrows   move the flame emitter
+//   space    burst of particles (cycles through the presets)
+//   a / d    wind left / right
+//   w / s    low gravity / heavy gravity
+//   escape   quit
+//
+// Set HEADLESS = true (bottom of the file) for a window-less stress test that
+// prints ms per simulation step. Works with a plain `make` build.
+//
+// DESIGN (why this is fast on a VM like Lunar)
+//   * Struct-of-arrays: one flat number array per attribute, no object per
+//     particle, no per-particle field lookups or allocations.
+//   * Swap-remove: a dead particle is overwritten by the last live one, so the
+//     update and draw loops only ever touch live particles.
+//   * Baked color ramps: each preset's start->mid->end gradient AND its fade
+//     to the background are precomputed into small tables. Drawing a particle
+//     is one table lookup, with no per-frame color math and no alpha blending
+//     needed.
+//   * Hot loops run inside methods, copying arrays and settings into locals
+//     first. Globals are hash lookups in the VM, locals are not.
+//   * One fixed 1/60 s simulation step per frame, paced by sdl_delay(16).
+//     (No clock()-based timing: if clock() measures CPU time instead of wall
+//     time, a time-driven loop runs in slow motion.)
+//
+// API SKETCH
+//   let ps = ParticleSystem(capacity, bg_r, bg_g, bg_b);
+//   let id = ps.add_preset(preset);       // bakes the color ramp
+//   ps.add(emitter);                      // continuous emitter (uses rate)
+//   ps.burst(emitter, count);             // one-shot spawn
+//   ps.step(dt);   ps.draw();             // update / render via SDL2
+//   ps.gx, ps.gy, ps.drag                 // wind, gravity, damping
+//   ps.set_bounds(x0, y0, x1, y1)         // bouncy box
+//   ps.well_on, ps.well_x/y/k             // optional gravity well
+
+// ------------------------------------------------------------------ utils ----
+
+fn rnd() { ret random(0, 100000) / 100000.0; }        // [0, 1]
+fn rrange(a, b) { ret a + (b - a) * rnd(); }
+fn lerp(a, b, t) { ret a + (b - a) * t; }
+
+// ----------------------------------------------------------------- Preset ----
+// Look of a particle type. Colors are 0..255.
+//   life t goes 0 -> 1:  color (r0,g0,b0) -> (r1,g1,b1) -> (r2,g2,b2)
+//   size   goes size0 -> size1
+//   fade   t at which the particle starts dissolving into the background
+//   gscale how strongly gravity affects it (negative = buoyant, like fire)
+struct Preset {
+    init() {
+        self.size0 = 4; self.size1 = 1;
+        self.r0 = 255; self.g0 = 255; self.b0 = 255;
+        self.r1 = 255; self.g1 = 255; self.b1 = 255;
+        self.r2 = 255; self.g2 = 255; self.b2 = 255;
+        self.fade = 0.5;
+        self.gscale = 1;
+    }
+}
+
+// ---------------------------------------------------------------- Emitter ----
+// Spawn position = (x, y) + random offset of +-spread_x / +-spread_y.
+// Launch velocity:
+//   radial = false:  (vx, vy) + random vector inside a disc of radius jitter
+//   radial = true:   (vx, vy) + random direction * speed in [speed_min, speed_max]
+struct Emitter {
+    init(x, y, preset) {
+        self.x = x; self.y = y;
+        self.preset = preset;
+        self.active = true;
+        self.rate = 100;                 // particles per second
+        self.spread_x = 0; self.spread_y = 0;
+        self.vx = 0; self.vy = 0;
+        self.jitter = 40;
+        self.radial = false;
+        self.speed_min = 50; self.speed_max = 200;
+        self.life_min = 0.6; self.life_max = 1.4;
+        self.acc = 0;
+    }
+}
+
+// --------------------------------------------------------- ParticleSystem ----
+struct ParticleSystem {
+    init(capacity, bg_r, bg_g, bg_b) {
+        self.cap = capacity;
+        self.n = 0;                      // live particles
+
+        // per-particle attributes (struct of arrays)
+        self.px = []; self.py = [];
+        self.vx = []; self.vy = [];
+        self.age = []; self.life = [];
+        self.pid = [];                   // preset id
+        for (let i = 0; i < capacity; i = i + 1) {
+            push(self.px, 0); push(self.py, 0);
+            push(self.vx, 0); push(self.vy, 0);
+            push(self.age, 0); push(self.life, 1);
+            push(self.pid, 0);
+        }
+
+        // per-preset tables, indexed by preset id
+        self.p_s0 = []; self.p_s1 = []; self.p_g = [];
+        self.ramp_r = []; self.ramp_g = []; self.ramp_b = [];
+        self.ramp_n = 24;                // entries per color ramp
+
+        self.bg_r = bg_r; self.bg_g = bg_g; self.bg_b = bg_b;
+        self.emitters = [];
+
+        // world settings
+        self.gx = 0; self.gy = 400;      // wind / gravity (px/s^2)
+        self.drag = 0.4;                 // velocity damping per second
+        self.bounds = false;
+        self.bx0 = 0; self.by0 = 0; self.bx1 = 800; self.by1 = 600;
+        self.bounce = 0.5;               // restitution
+        self.friction = 0.15;            // horizontal loss on floor hit
+        self.well_on = false;            // gravity well (inverse-square pull)
+        self.well_x = 400; self.well_y = 300; self.well_k = 4000000;
+    }
+
+    set_bounds(x0, y0, x1, y1) {
+        self.bounds = true;
+        self.bx0 = x0; self.by0 = y0; self.bx1 = x1; self.by1 = y1;
+    }
+
+    add(em) { push(self.emitters, em); ret em; }
+
+    // Register a preset: stores size/gravity and bakes its color ramp
+    // (gradient + fade into the background). Returns the preset id.
+    add_preset(p) {
+        let id = len(self.p_s0);
+        push(self.p_s0, p.size0);
+        push(self.p_s1, p.size1);
+        push(self.p_g, p.gscale);
+
+        let rr = []; let gg = []; let bb = [];
+        let m = self.ramp_n - 1;
+        for (let k = 0; k < self.ramp_n; k = k + 1) {
+            let t = k / m;
+            let r = 0; let g = 0; let b = 0;
+            if (t < 0.5) {
+                let u = t * 2;
+                r = lerp(p.r0, p.r1, u); g = lerp(p.g0, p.g1, u); b = lerp(p.b0, p.b1, u);
+            } else {
+                let u = (t - 0.5) * 2;
+                r = lerp(p.r1, p.r2, u); g = lerp(p.g1, p.g2, u); b = lerp(p.b1, p.b2, u);
+            }
+            let a = 1;
+            if (t > p.fade) { a = 1 - (t - p.fade) / (1 - p.fade); }
+            if (a < 0) { a = 0; }
+            push(rr, floor(lerp(self.bg_r, r, a)));
+            push(gg, floor(lerp(self.bg_g, g, a)));
+            push(bb, floor(lerp(self.bg_b, b, a)));
+        }
+        push(self.ramp_r, rr); push(self.ramp_g, gg); push(self.ramp_b, bb);
+        ret id;
+    }
+
+    // Spawn one particle from an emitter. Returns 1 on success, 0 if full.
+    emit(em) {
+        let n = self.n;
+        if (n >= self.cap) { ret 0; }
+
+        let x = em.x; let y = em.y;
+        if (em.spread_x > 0) { x = x + (rnd() * 2 - 1) * em.spread_x; }
+        if (em.spread_y > 0) { y = y + (rnd() * 2 - 1) * em.spread_y; }
+
+        // random point in the unit disc (rejection sampling)
+        let dx = 0; let dy = 0; let d = 2;
+        while (d > 1 || d < 0.0001) {
+            dx = rnd() * 2 - 1;
+            dy = rnd() * 2 - 1;
+            d = dx * dx + dy * dy;
+        }
+
+        let vx = 0; let vy = 0;
+        if (em.radial) {
+            let s = rrange(em.speed_min, em.speed_max) / sqrt(d);   // unit dir * speed
+            vx = em.vx + dx * s;
+            vy = em.vy + dy * s;
+        } else {
+            vx = em.vx + dx * em.jitter;
+            vy = em.vy + dy * em.jitter;
+        }
+
+        self.px[n] = x;  self.py[n] = y;
+        self.vx[n] = vx; self.vy[n] = vy;
+        self.age[n] = 0;
+        self.life[n] = rrange(em.life_min, em.life_max);
+        self.pid[n] = em.preset;
+        self.n = n + 1;
+        ret 1;
+    }
+
+    burst(em, count) {
+        for (let i = 0; i < count; i = i + 1) { self.emit(em); }
+    }
+
+    step(dt) {
+        // 1. continuous emitters
+        let ems = self.emitters;
+        for (let e = 0; e < len(ems); e = e + 1) {
+            let em = ems[e];
+            if (em.active) {
+                em.acc = em.acc + em.rate * dt;
+                while (em.acc >= 1) {
+                    self.emit(em);
+                    em.acc = em.acc - 1;
+                }
+            }
+        }
+
+        // 2. integrate. Everything hot is copied into locals first.
+        let n = self.n;
+        let px = self.px; let py = self.py;
+        let vx = self.vx; let vy = self.vy;
+        let age = self.age; let life = self.life; let pid = self.pid;
+        let gs = self.p_g;
+        let gx = self.gx; let gy = self.gy;
+        let k = 1 - self.drag * dt;
+        if (k < 0) { k = 0; }
+        let well = self.well_on;
+        let wx = self.well_x; let wy = self.well_y; let wk = self.well_k;
+        let bounds = self.bounds;
+        let x0 = self.bx0; let y0 = self.by0; let x1 = self.bx1; let y1 = self.by1;
+        let bounce = self.bounce;
+        let keep = 1 - self.friction;
+
+        let i = 0;
+        while (i < n) {
+            let a = age[i] + dt;
+            if (a >= life[i]) {
+                // dead: overwrite with the last live particle, then re-check slot i
+                n = n - 1;
+                px[i] = px[n]; py[i] = py[n];
+                vx[i] = vx[n]; vy[i] = vy[n];
+                age[i] = age[n]; life[i] = life[n]; pid[i] = pid[n];
+            } else {
+                age[i] = a;
+                let g = gs[pid[i]];
+                let ax = gx * g;
+                let ay = gy * g;
+                let x = px[i];
+                let y = py[i];
+
+                if (well) {
+                    let dx = wx - x;
+                    let dy = wy - y;
+                    let d2 = dx * dx + dy * dy + 400;       // softened
+                    let inv = wk / (d2 * sqrt(d2));
+                    ax = ax + dx * inv;
+                    ay = ay + dy * inv;
+                }
+
+                let u = (vx[i] + ax * dt) * k;
+                let v = (vy[i] + ay * dt) * k;
+                x = x + u * dt;
+                y = y + v * dt;
+
+                if (bounds) {
+                    if (y > y1) { y = y1; v = -v * bounce; u = u * keep; }
+                    else if (y < y0) { y = y0; v = -v * bounce; }
+                    if (x < x0) { x = x0; u = -u * bounce; }
+                    else if (x > x1) { x = x1; u = -u * bounce; }
+                }
+
+                px[i] = x; py[i] = y;
+                vx[i] = u; vy[i] = v;
+                i = i + 1;
+            }
+        }
+        self.n = n;
+    }
+
+    // Draw every live particle as a square. SDL2 build only.
+    draw() {
+        let n = self.n;
+        let px = self.px; let py = self.py;
+        let age = self.age; let life = self.life; let pid = self.pid;
+        let s0 = self.p_s0; let s1 = self.p_s1;
+        let rr = self.ramp_r; let rg = self.ramp_g; let rb = self.ramp_b;
+        let top = self.ramp_n - 1;
+
+        for (let i = 0; i < n; i = i + 1) {
+            let t = age[i] / life[i];
+            let c = floor(t * top);
+            if (c > top) { c = top; }
+            let id = pid[i];
+            let s = s0[id] + (s1[id] - s0[id]) * t;
+            let w = floor(s);
+            if (w < 1) { w = 1; }
+            sdl_fill_rect(floor(px[i] - s * 0.5), floor(py[i] - s * 0.5), w, w,
+                          rr[id][c], rg[id][c], rb[id][c], 255);
+        }
+    }
+}
+
+// ------------------------------------------------------------------- Demo ----
+
+fn make_presets(ps) {
+    let fire = Preset();
+    fire.size0 = 7;  fire.size1 = 1;
+    fire.r0 = 255; fire.g0 = 245; fire.b0 = 170;
+    fire.r1 = 255; fire.g1 = 110; fire.b1 = 20;
+    fire.r2 = 90;  fire.g2 = 15;  fire.b2 = 10;
+    fire.fade = 0.45;
+    fire.gscale = -0.5;                   // rises
+
+    let water = Preset();
+    water.size0 = 4; water.size1 = 2;
+    water.r0 = 200; water.g0 = 235; water.b0 = 255;
+    water.r1 = 70;  water.g1 = 150; water.b1 = 255;
+    water.r2 = 20;  water.g2 = 60;  water.b2 = 170;
+    water.fade = 0.7;
+
+    let magic = Preset();
+    magic.size0 = 6; magic.size1 = 0;
+    magic.r0 = 255; magic.g0 = 255; magic.b0 = 255;
+    magic.r1 = 190; magic.g1 = 90;  magic.b1 = 255;
+    magic.r2 = 50;  magic.g2 = 10;  magic.b2 = 110;
+    magic.fade = 0.3;
+    magic.gscale = 0.15;
+
+    let spark = Preset();
+    spark.size0 = 3; spark.size1 = 1;
+    spark.r0 = 255; spark.g0 = 255; spark.b0 = 200;
+    spark.r1 = 255; spark.g1 = 200; spark.b1 = 60;
+    spark.r2 = 160; spark.g2 = 60;  spark.b2 = 10;
+    spark.fade = 0.6;
+
+    let ids = [];
+    push(ids, ps.add_preset(fire));       // 0
+    push(ids, ps.add_preset(water));      // 1
+    push(ids, ps.add_preset(magic));      // 2
+    push(ids, ps.add_preset(spark));      // 3
+    ret ids;
+}
+
+fn main() {
+    let W = 800;
+    let H = 600;
+    sdl_init("Lunar particles", W, H);
+
+    let ps = ParticleSystem(15000, 14, 16, 28);
+    let ids = make_presets(ps);
+    ps.set_bounds(0, 0, W, H - 8);
+
+    // flame you can move around
+    let flame = Emitter(W / 2, H - 120, ids[0]);
+    flame.rate = 240;
+    flame.spread_x = 12; flame.spread_y = 3;
+    flame.vy = -70;
+    flame.jitter = 28;
+    flame.life_min = 0.5; flame.life_max = 1.1;
+    ps.add(flame);
+
+    // fountain in the bottom-left
+    let fountain = Emitter(120, H - 20, ids[1]);
+    fountain.rate = 260;
+    fountain.spread_x = 5;
+    fountain.vy = -430;
+    fountain.jitter = 45;
+    fountain.life_min = 2.0; fountain.life_max = 2.6;
+    ps.add(fountain);
+
+    // burst-only emitter, preset changes on every burst
+    let blast = Emitter(0, 0, ids[2]);
+    blast.rate = 0;
+    blast.radial = true;
+    blast.speed_min = 80; blast.speed_max = 380;
+    blast.life_min = 0.8; blast.life_max = 1.8;
+
+    print "arrows: move flame | space: burst | a/d: wind | w/s: gravity | esc: quit";
+
+    let dt = 1.0 / 60.0;
+    let frames = 0;
+    let cur = 0;
+    let space_prev = false;
+    let running = true;
+
+    while (running) {
+        let e = sdl_poll();
+        if (e == "quit" || sdl_key_down("escape")) { running = false; }
+
+        // input
+        let speed = 300 * dt;
+        if (sdl_key_down("left"))  { flame.x = flame.x - speed; }
+        if (sdl_key_down("right")) { flame.x = flame.x + speed; }
+        if (sdl_key_down("up"))    { flame.y = flame.y - speed; }
+        if (sdl_key_down("down"))  { flame.y = flame.y + speed; }
+
+        ps.gx = 0;
+        if (sdl_key_down("a")) { ps.gx = -160; }
+        if (sdl_key_down("d")) { ps.gx = 160; }
+        ps.gy = 400;
+        if (sdl_key_down("w")) { ps.gy = 120; }
+        if (sdl_key_down("s")) { ps.gy = 1000; }
+
+        let sp = sdl_key_down("space");
+        if (sp && !space_prev) {
+            blast.x = flame.x;
+            blast.y = flame.y;
+            blast.preset = ids[cur];
+            ps.burst(blast, 500);
+            cur = cur + 1;
+            if (cur >= len(ids)) { cur = 0; }
+        }
+        space_prev = sp;
+
+        // one fixed step per frame (does not depend on clock())
+        ps.step(dt);
+
+        sdl_clear(14, 16, 28);
+        ps.draw();
+        sdl_present();
+        sdl_delay(16);
+
+        frames = frames + 1;
+        if (frames >= 120) {
+            print "particles " + str(ps.n);
+            frames = 0;
+        }
+    }
+
+    sdl_quit();
+}
+
+// Window-less stress test: fills the pool and times the simulation step.
+fn stress() {
+    let ps = ParticleSystem(20000, 0, 0, 0);
+    let ids = make_presets(ps);
+    ps.set_bounds(0, 0, 800, 600);
+    ps.well_on = true;                    // include the gravity well in the cost
+
+    let em = Emitter(400, 300, ids[0]);
+    em.rate = 9000;
+    em.jitter = 150;
+    em.life_min = 1.5; em.life_max = 2.5;
+    ps.add(em);
+
+    let dt = 1.0 / 60.0;
+    for (let i = 0; i < 120; i = i + 1) { ps.step(dt); }   // warm up to steady state
+
+    let steps = 600;
+    let t0 = clock();
+    for (let i = 0; i < steps; i = i + 1) { ps.step(dt); }
+    let t1 = clock();
+
+    print "live particles: " + str(ps.n);
+    print "ms per step:    " + str(floor((t1 - t0) * 1000000 / steps) / 1000);
+}
+
+let HEADLESS = true;      // true = stress test, no window needed
+
+if (!HEADLESS) { stress(); } else { main(); }

@@ -28,6 +28,15 @@ DL_LIBS :=
 endif
 LIBS = -lm $(DL_LIBS)
 
+# --- Install location ---------------------------------------------------
+# Linux: /usr/bin (as you asked). macOS: /usr/bin is protected by SIP, so use /usr/local.
+ifeq ($(PLATFORM),macos)
+PREFIX ?= /usr/local
+else
+PREFIX ?= /usr
+endif
+BINDIR = $(DESTDIR)$(PREFIX)/bin
+
 # --- libffi ---------------------------------------------------------------
 ifeq ($(PLATFORM),macos)
 FFI_FOUND := $(shell pkg-config --exists libffi 2>/dev/null && echo yes)
@@ -60,6 +69,14 @@ debug: $(SRC)
 		-DLUNAR_DEBUG_TRACE_EXECUTION \
 		-DLUNAR_DEBUG_PRINT_CODE \
 		-o $(DEBUG_TARGET) $(SRC) $(LIBS) $(FFI_LIBS)
+
+# Build first as your normal user, then: sudo make install
+install:
+	@test -f $(TARGET) || { echo "Run 'make' (or 'make sdl') first, then 'sudo make install'"; exit 1; }
+	install -Dm755 $(TARGET) $(BINDIR)/$(TARGET)
+
+uninstall:
+	rm -f $(BINDIR)/$(TARGET)
 
 gc-stress: $(SRC)
 	$(CC) $(CFLAGS) $(FFI_CFLAGS) -O0 -g \
