@@ -117,18 +117,23 @@ ObjUpvalue* new_upvalue(Value* slot) {
 }
 
 ObjStruct* new_struct(ObjString* name) {
+    // Allocate and init the table BEFORE the object: ALLOCATE can trigger a GC,
+    // and an unrooted half-built object would be swept (and its garbage
+    // `methods` pointer freed).
+    Table* methods = ALLOCATE(Table, 1);
+    init_table(methods);
     ObjStruct* klass = ALLOCATE_OBJ(ObjStruct, OBJ_STRUCT);
     klass->name      = name;
-    klass->methods   = ALLOCATE(Table, 1);
-    init_table(klass->methods);
+    klass->methods   = methods;
     return klass;
 }
 
 ObjInstance* new_instance(ObjStruct* klass) {
+    Table* fields = ALLOCATE(Table, 1);   // before the object, see new_struct
+    init_table(fields);
     ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
     instance->klass       = klass;
-    instance->fields      = ALLOCATE(Table, 1);
-    init_table(instance->fields);
+    instance->fields      = fields;
     return instance;
 }
 

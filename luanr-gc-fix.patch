@@ -1,0 +1,56 @@
+diff --git a/src/object.c b/src/object.c
+index 64e1a07..260663f 100644
+--- a/src/object.c
++++ b/src/object.c
+@@ -117,18 +117,23 @@ ObjUpvalue* new_upvalue(Value* slot) {
+ }
+ 
+ ObjStruct* new_struct(ObjString* name) {
++    // Allocate and init the table BEFORE the object: ALLOCATE can trigger a GC,
++    // and an unrooted half-built object would be swept (and its garbage
++    // `methods` pointer freed).
++    Table* methods = ALLOCATE(Table, 1);
++    init_table(methods);
+     ObjStruct* klass = ALLOCATE_OBJ(ObjStruct, OBJ_STRUCT);
+     klass->name      = name;
+-    klass->methods   = ALLOCATE(Table, 1);
+-    init_table(klass->methods);
++    klass->methods   = methods;
+     return klass;
+ }
+ 
+ ObjInstance* new_instance(ObjStruct* klass) {
++    Table* fields = ALLOCATE(Table, 1);   // before the object, see new_struct
++    init_table(fields);
+     ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
+     instance->klass       = klass;
+-    instance->fields      = ALLOCATE(Table, 1);
+-    init_table(instance->fields);
++    instance->fields      = fields;
+     return instance;
+ }
+ 
+diff --git a/src/vm.c b/src/vm.c
+index e7a109d..6c069f0 100644
+--- a/src/vm.c
++++ b/src/vm.c
+@@ -57,13 +57,15 @@ void init_lunar_vm() {
+ 
+     ObjNative* ffiLoadNative = new_native(ffi_load_library, "clib");
+     push(OBJ_VAL(ffiLoadNative)); // Push to stack to protect from a sudden GC sweep
+-    table_set(&lvm.globals, copy_str("clib", 4), OBJ_VAL(ffiLoadNative));
+-    pop(); // Safely pop it back off
++    push(OBJ_VAL(copy_str("clib", 4)));   // root the name too: table_set can trigger GC
++    table_set(&lvm.globals, AS_STRING(lvm.stack_top[-1]), lvm.stack_top[-2]);
++    pop(); pop();
+ 
+     ObjNative* ffiBindNative = new_native(ffi_bind_function, "cbind");
+     push(OBJ_VAL(ffiBindNative));
+-    table_set(&lvm.globals, copy_str("cbind", 5), OBJ_VAL(ffiBindNative));
+-    pop();
++    push(OBJ_VAL(copy_str("cbind", 5)));
++    table_set(&lvm.globals, AS_STRING(lvm.stack_top[-1]), lvm.stack_top[-2]);
++    pop(); pop();
+ 
+ #ifdef LUNAR_SDL
+     register_sdl_natives();
