@@ -1,0 +1,1050 @@
+// =============================================================================
+//  Universe-0  --  a 2D open-world ecosystem simulation, written in Lunar.
+//	
+//  Terrain is procedurally generated (water, sand, grass, forest). Plants grow
+//  and seed themselves, rabbits graze and flee, foxes hunt rabbits, and both
+//  species find mates and reproduce. Seasons make plant growth swell and shrink
+//  over a year, so populations boom and crash. Nothing is scripted.
+//	
+//	author:    Ahmad Odeh
+//  date: 	   24th Oct, 2026
+//  Build:     make sdl
+//  Run:       ./lunar universe0.lunar
+//  Controls:  W A S D / arrow keys = move camera,  SPACE = pause,
+//             E = faster,  Q = slower,  R = new world,  ESC = quit
+// =============================================================================
+
+
+// ----------------------------------------------------------------------------
+//  Configuration
+// ----------------------------------------------------------------------------
+
+// World and window
+let WORLD_W     = 100;      // tiles
+let WORLD_H     = 70;       // tiles
+let TILE        = 16;       // pixels per tile
+let VIEW_W      = 960;
+let VIEW_H      = 640;
+let CAMERA_STEP = 10;
+
+// Terrain types
+let WATER  = 0;
+let SAND   = 1;
+let GRASS  = 2;
+let FOREST = 3;
+let BLUR_PASSES = 6;
+
+// Flora
+let MAX_PLANTS      = 3000;
+let PLANT_RIPE      = 60;      // size at which a plant can be eaten
+let PLANT_GROWTH    = 0.06;    // size gained per tick on fertility 1.0
+let SPREAD_CHANCE   = 0.0015;  // per tick, for a fully grown plant
+let SEED_RAIN       = 0.05;    // per tick, wind-blown seed lands somewhere
+let INITIAL_PLANTS  = 800;
+
+// Seasons: one year is a triangle wave from deep winter to midsummer and back.
+let YEAR_LENGTH   = 4000;      // ticks
+let SEASON_OFFSET = 1000;      // start the world in spring
+let WINTER_GROWTH = 0.6;       // growth multiplier at the coldest point
+let SUMMER_GROWTH = 1.4;       // growth multiplier at the warmest point
+
+// Fauna
+let THINK_INTERVAL   = 8;      // ticks between decisions
+let INDEX_CELL       = 128;    // spatial index bucket size in pixels
+let MAX_ANIMALS      = 500;
+let INITIAL_RABBITS  = 120;
+let INITIAL_FOXES    = 9;
+let RABBIT_CAP       = 350;
+let FOX_CAP          = 45;
+
+// HUD and simulation speed
+let HISTORY_LENGTH   = 100;
+let HISTORY_INTERVAL = 30;
+let STATS_INTERVAL   = 600;
+let SPEEDS           = [1, 2, 4, 8, 16];   // simulation ticks per frame
+
+
+// ----------------------------------------------------------------------------
+//  Utilities
+// ----------------------------------------------------------------------------
+
+fn clamp(v, lo, hi) {
+    if (v < lo) ret lo;
+    if (v > hi) ret hi;
+    ret v;
+}
+
+fn rand_range(lo, hi) {
+    ret lo + random(0, 10000) / 10000 * (hi - lo);
+}
+
+fn chance(p) {
+    ret random(0, 9999) < p * 10000;
+}
+
+fn dist2(ax, ay, bx, by) {
+    let dx = ax - bx;
+    let dy = ay - by;
+    ret dx * dx + dy * dy;
+}
+
+struct Point {
+    init(x, y) {
+        self.x = x;
+        self.y = y;
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  Terrain: a grid of tiles generated from blurred random noise
+// ----------------------------------------------------------------------------
+
+struct Terrain {
+    init(w, h) {
+        self.w = w;
+        self.h = h;
+        self.tiles = self.generate();
+    }
+
+    in_bounds(tx, ty) {
+        ret tx >= 0 && ty >= 0 && tx < self.w && ty < self.h;
+    }
+
+    tile(tx, ty) {
+        if (!self.in_bounds(tx, ty)) ret WATER;
+        ret self.tiles[ty * self.w + tx];
+    }
+
+    // How well plants grow here. Zero means nothing can grow.
+    fertility(tx, ty) {
+        let t = self.tile(tx, ty);
+        if (t == FOREST) ret 1.6;
+        if (t == GRASS)  ret 1.0;
+        if (t == SAND)   ret 0.25;
+        ret 0;
+    }
+
+    walkable_px(x, y) {
+        ret self.tile(floor(x / TILE), floor(y / TILE)) != WATER;
+    }
+
+    generate() {
+        let field = [];
+        for (let i = 0; i < self.w * self.h; i = i + 1) {
+            push(field, random(0, 1000));
+        }
+        for (let pass = 0; pass < BLUR_PASSES; pass = pass + 1) {
+            field = self.blur(field);
+        }
+        ret self.classify(field);
+    }
+
+    // Average every cell with its 3x3 neighbourhood.
+    blur(src) {
+        let out = [];
+        for (let y = 0; y < self.h; y = y + 1) {
+            for (let x = 0; x < self.w; x = x + 1) {
+                let sum = 0;
+                let n = 0;
+                for (let oy = -1; oy <= 1; oy = oy + 1) {
+                    for (let ox = -1; ox <= 1; ox = ox + 1) {
+                        if (self.in_bounds(x + ox, y + oy)) {
+                            sum = sum + src[(y + oy) * self.w + (x + ox)];
+                            n = n + 1;
+                        }
+                    }
+                }
+                push(out, sum / n);
+            }
+        }
+        ret out;
+    }
+
+    // Stretch the field to 0..100 and bucket it into terrain types.
+    classify(field) {
+        let lo = field[0];
+        let hi = field[0];
+        for (let i = 1; i < len(field); i = i + 1) {
+            if (field[i] < lo) lo = field[i];
+            if (field[i] > hi) hi = field[i];
+        }
+
+        let tiles = [];
+        for (let i = 0; i < len(field); i = i + 1) {
+            let t = (field[i] - lo) / (hi - lo) * 100;
+            if (t < 34)      push(tiles, WATER);
+            else if (t < 39) push(tiles, SAND);
+            else if (t < 66) push(tiles, GRASS);
+            else             push(tiles, FOREST);
+        }
+        ret tiles;
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  Flora: plants live in a tile grid (one per tile) plus a flat list.
+//  The list is only compacted once enough dead plants pile up, so a normal
+//  tick allocates nothing.
+// ----------------------------------------------------------------------------
+
+struct Plant {
+    init(tx, ty, fertility) {
+        self.tx = tx;
+        self.ty = ty;
+        self.x = tx * TILE + TILE / 2;    // pixel centre, so animals can target it
+        self.y = ty * TILE + TILE / 2;
+        self.fertility = fertility;
+        self.size = 0;                    // 0..100
+        self.alive = true;
+    }
+
+    ripe() {
+        ret self.size >= PLANT_RIPE;
+    }
+}
+
+struct Flora {
+    init(terrain) {
+        self.terrain = terrain;
+        self.grid = [];
+        for (let i = 0; i < terrain.w * terrain.h; i = i + 1) {
+            push(self.grid, nil);
+        }
+        self.plants = [];
+        self.count = 0;     // living plants
+        self.dead = 0;      // dead plants still sitting in the list
+    }
+
+    plantable(tx, ty) {
+        ret self.terrain.fertility(tx, ty) > 0 && self.grid[ty * self.terrain.w + tx] == nil;
+    }
+
+    add(tx, ty, size) {
+        if (self.count >= MAX_PLANTS) ret;
+        let p = Plant(tx, ty, self.terrain.fertility(tx, ty));
+        p.size = size;
+        self.grid[ty * self.terrain.w + tx] = p;
+        push(self.plants, p);
+        self.count = self.count + 1;
+    }
+
+    remove(p) {
+        p.alive = false;
+        self.grid[p.ty * self.terrain.w + p.tx] = nil;
+        self.count = self.count - 1;
+        self.dead = self.dead + 1;
+    }
+
+    // Drop dead plants from the list (rare).
+    compact() {
+        let kept = [];
+        for (let i = 0; i < len(self.plants); i = i + 1) {
+            if (self.plants[i].alive) push(kept, self.plants[i]);
+        }
+        self.plants = kept;
+        self.dead = 0;
+    }
+
+    // `season` scales growth: below 1 is winter, above 1 is summer.
+    update(season) {
+        // Plants added during this loop are appended past n and start next tick.
+        let n = len(self.plants);
+        for (let i = 0; i < n; i = i + 1) {
+            let p = self.plants[i];
+            if (p.alive) self.grow(p, season);
+        }
+        if (self.dead > 150) self.compact();
+        if (chance(SEED_RAIN * season)) self.scatter_seed();
+    }
+
+    grow(p, season) {
+        if (p.size < 100) {
+            p.size = p.size + PLANT_GROWTH * p.fertility * season;
+        } else if (chance(SPREAD_CHANCE * season)) {
+            self.spread_from(p);
+        }
+    }
+
+    spread_from(p) {
+        let tx = p.tx + random(-2, 2);
+        let ty = p.ty + random(-2, 2);
+        if (self.terrain.in_bounds(tx, ty) && self.plantable(tx, ty)) {
+            self.add(tx, ty, 0);
+        }
+    }
+
+    scatter_seed() {
+        let tx = random(0, self.terrain.w - 1);
+        let ty = random(0, self.terrain.h - 1);
+        if (self.plantable(tx, ty)) self.add(tx, ty, 0);
+    }
+
+    // Closest ripe plant within `radius` pixels, or nil.
+    nearest_ripe(x, y, radius) {
+        let cx = floor(x / TILE);
+        let cy = floor(y / TILE);
+        let reach = ceil(radius / TILE);
+        let x0 = clamp(cx - reach, 0, self.terrain.w - 1);
+        let x1 = clamp(cx + reach, 0, self.terrain.w - 1);
+        let y0 = clamp(cy - reach, 0, self.terrain.h - 1);
+        let y1 = clamp(cy + reach, 0, self.terrain.h - 1);
+
+        let best = nil;
+        let best_d2 = radius * radius;
+        for (let ty = y0; ty <= y1; ty = ty + 1) {
+            for (let tx = x0; tx <= x1; tx = tx + 1) {
+                let p = self.grid[ty * self.terrain.w + tx];
+                if (p != nil && p.ripe()) {
+                    let d2 = dist2(x, y, p.x, p.y);
+                    if (d2 < best_d2) {
+                        best = p;
+                        best_d2 = d2;
+                    }
+                }
+            }
+        }
+        ret best;
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  Spatial index: buckets animals by coarse cell so neighbour queries stay
+//  cheap. Each bucket is a linked list threaded through animal.next_in_cell,
+//  so rebuilding every tick allocates nothing.
+// ----------------------------------------------------------------------------
+
+struct AnimalIndex {
+    init(width_px, height_px) {
+        self.cols = ceil(width_px / INDEX_CELL);
+        self.rows = ceil(height_px / INDEX_CELL);
+        self.heads = [];
+        for (let i = 0; i < self.cols * self.rows; i = i + 1) {
+            push(self.heads, nil);
+        }
+    }
+
+    col(x) { ret clamp(floor(x / INDEX_CELL), 0, self.cols - 1); }
+    row(y) { ret clamp(floor(y / INDEX_CELL), 0, self.rows - 1); }
+
+    rebuild(animals) {
+        for (let i = 0; i < len(self.heads); i = i + 1) {
+            self.heads[i] = nil;
+        }
+        for (let i = 0; i < len(animals); i = i + 1) {
+            let a = animals[i];
+            if (a.alive) {
+                let cell = self.row(a.y) * self.cols + self.col(a.x);
+                a.next_in_cell = self.heads[cell];
+                self.heads[cell] = a;
+            }
+        }
+    }
+
+    // Closest living animal of `kind` within `radius` pixels. If `breeders`
+    // is true only animals that can breed right now count. `exclude` is
+    // skipped (pass nil to skip nobody).
+    nearest(x, y, radius, kind, breeders, exclude) {
+        let c0 = self.col(x - radius);
+        let c1 = self.col(x + radius);
+        let r0 = self.row(y - radius);
+        let r1 = self.row(y + radius);
+
+        let best = nil;
+        let best_d2 = radius * radius;
+        for (let r = r0; r <= r1; r = r + 1) {
+            for (let c = c0; c <= c1; c = c + 1) {
+                let a = self.heads[r * self.cols + c];
+                while (a != nil) {
+                    if (a.alive && a.kind == kind && a != exclude) {
+                        if (!breeders || a.can_breed()) {
+                            let d2 = dist2(x, y, a.x, a.y);
+                            if (d2 < best_d2) {
+                                best = a;
+                                best_d2 = d2;
+                            }
+                        }
+                    }
+                    a = a.next_in_cell;
+                }
+            }
+        }
+        ret best;
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  Fauna
+//
+//  An animal re-decides what to do every THINK_INTERVAL ticks (think), then
+//  every tick it acts on contact (act), steers and moves (move) and burns
+//  energy. Goals: "wander", "eat", "hunt", "mate", "flee".
+// ----------------------------------------------------------------------------
+
+struct Animal {
+    init(kind, x, y) {
+        self.kind = kind;
+        self.x = x;
+        self.y = y;
+        self.alive = true;
+        self.age = 0;
+        self.cooldown = 0;           // ticks until it may breed again
+        self.dx = 0;                 // current heading (unit vector)
+        self.dy = 0;
+        self.goal = "wander";
+        self.target = nil;
+        self.speed_mult = 0.5;
+        self.next_in_cell = nil;     // spatial index link
+        self.think_timer = random(0, THINK_INTERVAL);
+    }
+
+    // ---- per-tick pipeline ----
+
+    update(world) {
+        if (!self.alive) ret;
+
+        self.age = self.age + 1;
+        if (self.cooldown > 0) self.cooldown = self.cooldown - 1;
+
+        self.think_timer = self.think_timer - 1;
+        if (self.think_timer <= 0) {
+            self.think_timer = THINK_INTERVAL;
+            self.think(world);
+        }
+
+        self.act(world);
+        self.move(world);
+        self.burn_energy();
+
+        if (self.energy <= 0 || self.age >= self.lifespan) self.die();
+    }
+
+    think(world) { }                 // species decide here
+    make_child(x, y) { ret nil; }    // species build their offspring here
+
+    // ---- goals ----
+
+    set_goal(goal, target, speed_mult) {
+        self.goal = goal;
+        self.target = target;
+        self.speed_mult = speed_mult;
+    }
+
+    drop_target() {
+        self.goal = "wander";
+        self.target = nil;
+        self.think_timer = 0;        // decide again next tick
+    }
+
+    wander() {
+        self.goal = "wander";
+        self.target = nil;
+        self.speed_mult = 0.5;
+        let idle = self.dx == 0 && self.dy == 0;
+        if (idle || chance(0.3)) {
+            if (chance(0.2)) {
+                self.dx = 0;
+                self.dy = 0;
+            } else {
+                self.set_heading(rand_range(-1, 1), rand_range(-1, 1));
+            }
+        }
+    }
+
+    // ---- contact actions ----
+
+    act(world) {
+        let t = self.target;
+        if (t == nil) ret;
+        if (!t.alive) {
+            self.drop_target();
+            ret;
+        }
+        if (dist2(self.x, self.y, t.x, t.y) > self.reach * self.reach) ret;
+
+        if (self.goal == "eat")       self.eat_plant(world, t);
+        else if (self.goal == "hunt") self.eat_prey(t);
+        else if (self.goal == "mate") self.mate_with(world, t);
+    }
+
+    eat_plant(world, plant) {
+        world.flora.remove(plant);
+        self.gain(self.meal_energy);
+        self.drop_target();
+    }
+
+    eat_prey(prey) {
+        prey.die();
+        self.gain(self.meal_energy);
+        self.drop_target();
+    }
+
+    mate_with(world, partner) {
+        let room = world.count(self.kind) < self.max_population
+                && world.living() < MAX_ANIMALS;
+        if (room && self.can_breed() && partner.can_breed()) {
+            world.add_animal(self.make_child(self.x, self.y));
+            self.pay_birth();
+            partner.pay_birth();
+        }
+        self.drop_target();
+    }
+
+    // ---- reproduction ----
+
+    can_breed() {
+        ret self.age >= self.maturity
+            && self.cooldown <= 0
+            && self.energy >= self.max_energy * 0.7;
+    }
+
+    pay_birth() {
+        self.energy = self.energy - self.birth_cost;
+        self.cooldown = self.breed_cooldown;
+    }
+
+    find_mate(world) {
+        ret world.index.nearest(self.x, self.y, self.vision * 1.5, self.kind, true, self);
+    }
+
+    // ---- movement ----
+
+    set_heading(dx, dy) {
+        let length = sqrt(dx * dx + dy * dy);
+        if (length < 0.0001) {
+            self.dx = 0;
+            self.dy = 0;
+        } else {
+            self.dx = dx / length;
+            self.dy = dy / length;
+        }
+    }
+
+    steer() {
+        let t = self.target;
+        if (t == nil) ret;
+        if (self.goal == "flee") self.set_heading(self.x - t.x, self.y - t.y);
+        else                     self.set_heading(t.x - self.x, t.y - self.y);
+    }
+
+    // Axes are tested separately so animals slide along shorelines.
+    move(world) {
+        self.steer();
+        let step = self.speed * self.speed_mult;
+        let nx = self.x + self.dx * step;
+        let ny = self.y + self.dy * step;
+        let blocked = false;
+
+        if (world.terrain.walkable_px(nx, self.y)) self.x = nx;
+        else blocked = true;
+        if (world.terrain.walkable_px(self.x, ny)) self.y = ny;
+        else blocked = true;
+
+        if (blocked && self.goal == "wander") {
+            self.set_heading(rand_range(-1, 1), rand_range(-1, 1));
+        }
+    }
+
+    // ---- energy and death ----
+
+    burn_energy() {
+        self.energy = self.energy - self.metabolism * (0.5 + 0.5 * self.speed_mult);
+    }
+
+    gain(amount) {
+        self.energy = self.energy + amount;
+        if (self.energy > self.max_energy) self.energy = self.max_energy;
+    }
+
+    die() {
+        self.alive = false;
+        self.target = nil;
+    }
+
+    // Used to seed the world with animals that are already grown up.
+    make_adult() {
+        self.age = self.maturity + random(0, floor(self.lifespan / 3));
+        self.energy = self.max_energy * rand_range(0.5, 0.9);
+    }
+}
+
+
+struct Rabbit < Animal {
+    init(x, y) {
+        super.init("rabbit", x, y);
+        self.speed          = 1.5 * rand_range(0.9, 1.1);
+        self.vision         = 110;
+        self.reach          = 8;
+        self.max_energy     = 100;
+        self.energy         = 50;
+        self.metabolism     = 0.028;
+        self.hungry_below   = 65;
+        self.meal_energy    = 40;
+        self.maturity       = 900;
+        self.lifespan       = 7000 + random(0, 2000);
+        self.breed_cooldown = 1200;
+        self.birth_cost     = 22;
+        self.max_population = RABBIT_CAP;
+        // look
+        self.w = 8;
+        self.h = 6;
+        self.cr = 235;
+        self.cg = 232;
+        self.cb = 225;
+    }
+
+    make_child(x, y) { ret Rabbit(x, y); }
+
+    // Priorities: run from foxes > eat when hungry > find a mate > wander.
+    think(world) {
+        let threat = world.index.nearest(self.x, self.y, self.vision, "fox", false, nil);
+        if (threat != nil) {
+            self.set_goal("flee", threat, 1.4);
+            ret;
+        }
+
+        if (self.energy < self.hungry_below) {
+            let food = world.flora.nearest_ripe(self.x, self.y, self.vision);
+            if (food != nil) {
+                self.set_goal("eat", food, 0.9);
+                ret;
+            }
+        } else if (self.can_breed()) {
+            let mate = self.find_mate(world);
+            if (mate != nil) {
+                self.set_goal("mate", mate, 0.9);
+                ret;
+            }
+        }
+        self.wander();
+    }
+}
+
+
+struct Fox < Animal {
+    init(x, y) {
+        super.init("fox", x, y);
+        self.speed          = 1.9 * rand_range(0.9, 1.1);
+        self.vision         = 170;
+        self.reach          = 10;
+        self.max_energy     = 200;
+        self.energy         = 100;
+        self.metabolism     = 0.04;
+        self.hungry_below   = 130;
+        self.meal_energy    = 90;
+        self.maturity       = 2000;
+        self.lifespan       = 14000 + random(0, 4000);
+        self.breed_cooldown = 3000;
+        self.birth_cost     = 50;
+        self.max_population = FOX_CAP;
+        // look
+        self.w = 12;
+        self.h = 8;
+        self.cr = 225;
+        self.cg = 110;
+        self.cb = 40;
+    }
+
+    make_child(x, y) { ret Fox(x, y); }
+
+    // Priorities: hunt when hungry > find a mate > wander.
+    think(world) {
+        if (self.energy < self.hungry_below) {
+            let prey = world.index.nearest(self.x, self.y, self.vision, "rabbit", false, nil);
+            if (prey != nil) {
+                self.set_goal("hunt", prey, 1.3);
+                ret;
+            }
+        } else if (self.can_breed()) {
+            let mate = self.find_mate(world);
+            if (mate != nil) {
+                self.set_goal("mate", mate, 0.9);
+                ret;
+            }
+        }
+        self.wander();
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  History: fixed-length ring buffer of samples for the HUD graph.
+//  Oldest sample is at `pos` once the buffer is full (pos stays 0 until then).
+// ----------------------------------------------------------------------------
+
+struct History {
+    init(capacity) {
+        self.capacity = capacity;
+        self.values = [];
+        self.pos = 0;
+    }
+
+    record(v) {
+        if (len(self.values) < self.capacity) {
+            push(self.values, v);
+        } else {
+            self.values[self.pos] = v;
+            self.pos = (self.pos + 1) % self.capacity;
+        }
+    }
+
+    // i-th sample counting from the oldest.
+    at(i) {
+        ret self.values[(self.pos + i) % len(self.values)];
+    }
+
+    size() {
+        ret len(self.values);
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  World: owns all simulation state and advances it one tick at a time
+// ----------------------------------------------------------------------------
+
+struct World {
+    init() {
+        self.tick = 0;
+        self.terrain = Terrain(WORLD_W, WORLD_H);
+        self.flora = Flora(self.terrain);
+        self.index = AnimalIndex(WORLD_W * TILE, WORLD_H * TILE);
+        self.animals = [];
+        self.plant_history = History(HISTORY_LENGTH);
+        self.rabbit_history = History(HISTORY_LENGTH);
+        self.fox_history = History(HISTORY_LENGTH);
+        self.populate();
+    }
+
+    populate() {
+        for (let i = 0; i < INITIAL_PLANTS; i = i + 1) {
+            let tx = random(0, WORLD_W - 1);
+            let ty = random(0, WORLD_H - 1);
+            if (self.flora.plantable(tx, ty)) self.flora.add(tx, ty, random(0, 100));
+        }
+        for (let i = 0; i < INITIAL_RABBITS; i = i + 1) {
+            let p = self.random_land_point();
+            let rabbit = Rabbit(p.x, p.y);
+            rabbit.make_adult();
+            self.add_animal(rabbit);
+        }
+        for (let i = 0; i < INITIAL_FOXES; i = i + 1) {
+            let p = self.random_land_point();
+            let fox = Fox(p.x, p.y);
+            fox.make_adult();
+            self.add_animal(fox);
+        }
+    }
+
+    random_land_point() {
+        let p = Point(0, 0);
+        let found = false;
+        while (!found) {
+            p.x = random(0, WORLD_W * TILE - 1);
+            p.y = random(0, WORLD_H * TILE - 1);
+            found = self.terrain.walkable_px(p.x, p.y);
+        }
+        ret p;
+    }
+
+    add_animal(animal) {
+        push(self.animals, animal);
+    }
+
+    count(kind) {
+        let n = 0;
+        for (let i = 0; i < len(self.animals); i = i + 1) {
+            if (self.animals[i].alive && self.animals[i].kind == kind) n = n + 1;
+        }
+        ret n;
+    }
+
+    // All living animals (the list may still hold a few dead ones).
+    living() {
+        let n = 0;
+        for (let i = 0; i < len(self.animals); i = i + 1) {
+            if (self.animals[i].alive) n = n + 1;
+        }
+        ret n;
+    }
+
+    // 0 = deep winter, 1 = midsummer.
+    season_wave() {
+        let phase = ((self.tick + SEASON_OFFSET) % YEAR_LENGTH) / YEAR_LENGTH;
+        if (phase < 0.5) ret phase * 2;
+        ret (1 - phase) * 2;
+    }
+
+    // Plant growth multiplier for the current time of year.
+    season() {
+        ret WINTER_GROWTH + self.season_wave() * (SUMMER_GROWTH - WINTER_GROWTH);
+    }
+
+    // 0 = summer, 1 = deep winter (used to tint the map).
+    winter() {
+        ret 1 - self.season_wave();
+    }
+
+    step() {
+        self.tick = self.tick + 1;
+        self.index.rebuild(self.animals);
+        self.flora.update(self.season());
+
+        // Newborns are appended past `n`, so they first act on the next tick.
+        let n = len(self.animals);
+        for (let i = 0; i < n; i = i + 1) {
+            self.animals[i].update(self);
+        }
+        if (self.tick % 30 == 0) self.remove_dead();
+
+        if (self.tick % HISTORY_INTERVAL == 0) self.record_history();
+        if (self.tick % STATS_INTERVAL == 0)   self.print_stats();
+    }
+
+    remove_dead() {
+        let living = [];
+        for (let i = 0; i < len(self.animals); i = i + 1) {
+            if (self.animals[i].alive) push(living, self.animals[i]);
+        }
+        self.animals = living;
+    }
+
+    record_history() {
+        self.plant_history.record(self.flora.count / MAX_PLANTS);
+        self.rabbit_history.record(self.count("rabbit") / RABBIT_CAP);
+        self.fox_history.record(self.count("fox") / FOX_CAP);
+    }
+
+    print_stats() {
+        print "tick " + str(self.tick)
+            + " | year " + str(floor(self.tick / YEAR_LENGTH))
+            + " | plants " + str(self.flora.count)
+            + " | rabbits " + str(self.count("rabbit"))
+            + " | foxes " + str(self.count("fox"));
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  Camera
+// ----------------------------------------------------------------------------
+
+struct Camera {
+    init() {
+        self.x = (WORLD_W * TILE - VIEW_W) / 2;
+        self.y = (WORLD_H * TILE - VIEW_H) / 2;
+    }
+
+    update() {
+        if (sdl_key_down("left")  || sdl_key_down("a")) self.x = self.x - CAMERA_STEP;
+        if (sdl_key_down("right") || sdl_key_down("d")) self.x = self.x + CAMERA_STEP;
+        if (sdl_key_down("up")    || sdl_key_down("w")) self.y = self.y - CAMERA_STEP;
+        if (sdl_key_down("down")  || sdl_key_down("s")) self.y = self.y + CAMERA_STEP;
+        self.x = clamp(self.x, 0, WORLD_W * TILE - VIEW_W);
+        self.y = clamp(self.y, 0, WORLD_H * TILE - VIEW_H);
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  Renderer
+// ----------------------------------------------------------------------------
+
+struct Renderer {
+    init() {
+        // Base colour per terrain type, indexed by WATER, SAND, GRASS, FOREST.
+        self.tile_r = [ 38, 205,  92,  50];
+        self.tile_g = [ 92, 190, 150, 108];
+        self.tile_b = [168, 135,  66,  52];
+    }
+
+    draw(world, camera, paused, speed_level) {
+        sdl_clear(0, 0, 0);
+        self.draw_land(world, camera);
+        self.draw_animals(world.animals, camera);
+        self.draw_graph(world);
+        self.draw_hud(world, paused, speed_level);
+        sdl_present();
+    }
+
+    // Terrain and plants share one pass over the visible tiles.
+    // Grass and forest fade towards a frosty colour in winter.
+    draw_land(world, camera) {
+        let terrain = world.terrain;
+        let x0 = clamp(floor(camera.x / TILE), 0, terrain.w - 1);
+        let x1 = clamp(ceil((camera.x + VIEW_W) / TILE), 0, terrain.w - 1);
+        let y0 = clamp(floor(camera.y / TILE), 0, terrain.h - 1);
+        let y1 = clamp(ceil((camera.y + VIEW_H) / TILE), 0, terrain.h - 1);
+        let shimmer = floor(world.tick / 25);
+
+        let cold = world.winter();
+        let frost_r = floor(cold * 40);
+        let frost_g = floor(cold * 20);
+        let frost_b = floor(cold * 30);
+
+        for (let ty = y0; ty <= y1; ty = ty + 1) {
+            for (let tx = x0; tx <= x1; tx = tx + 1) {
+                let i = ty * terrain.w + tx;
+                let t = terrain.tiles[i];
+                let shade = (tx * 7 + ty * 13) % 5 * 3;
+                if (t == WATER) shade = (tx + ty + shimmer) % 4 * 5;
+
+                let r = self.tile_r[t] + shade;
+                let g = self.tile_g[t] + shade;
+                let b = self.tile_b[t] + shade;
+                if (t == GRASS || t == FOREST) {
+                    r = r + frost_r;
+                    g = g - frost_g;
+                    b = b + frost_b;
+                }
+
+                let sx = tx * TILE - camera.x;
+                let sy = ty * TILE - camera.y;
+                sdl_fill_rect(sx, sy, TILE, TILE, r, g, b, 255);
+
+                let plant = world.flora.grid[i];
+                if (plant != nil) self.draw_plant(plant, sx, sy);
+            }
+        }
+    }
+
+    draw_plant(plant, sx, sy) {
+        let s = 3 + floor(plant.size / 100 * 8);
+        let ox = sx + (TILE - s) / 2;
+        let oy = sy + (TILE - s) / 2;
+        if (plant.ripe()) {
+            sdl_fill_rect(ox, oy, s, s, 24, 88, 36, 255);
+            sdl_fill_rect(ox + s - 3, oy, 3, 3, 210, 50, 70, 255);   // berry
+        } else {
+            sdl_fill_rect(ox, oy, s, s, 120, 190, 80, 255);
+        }
+    }
+
+    draw_animals(animals, camera) {
+        for (let i = 0; i < len(animals); i = i + 1) {
+            let a = animals[i];
+            let sx = a.x - camera.x;
+            let sy = a.y - camera.y;
+            if (a.alive && sx > -20 && sy > -20 && sx < VIEW_W + 20 && sy < VIEW_H + 20) {
+                self.draw_animal(a, sx, sy);
+            }
+        }
+    }
+
+    // Young animals are drawn smaller until they reach maturity.
+    draw_animal(a, sx, sy) {
+        let w = a.w;
+        let h = a.h;
+        if (a.age < a.maturity) {
+            w = floor(a.w * 0.7);
+            h = floor(a.h * 0.7);
+        }
+        let x = sx - w / 2;
+        let y = sy - h / 2;
+        sdl_fill_rect(x - 1, y - 1, w + 2, h + 2, 20, 20, 20, 255);   // outline
+        sdl_fill_rect(x, y, w, h, a.cr, a.cg, a.cb, 255);
+
+        // A small flag above the head shows what the animal is doing.
+        if (a.goal == "flee")      sdl_fill_rect(x, y - 5, 3, 3, 255, 230, 60, 255);
+        else if (a.goal == "hunt") sdl_fill_rect(x, y - 5, 3, 3, 230, 40, 40, 255);
+        else if (a.goal == "mate") sdl_fill_rect(x, y - 5, 3, 3, 255, 120, 200, 255);
+        else if (a.goal == "eat")  sdl_fill_rect(x, y - 5, 3, 3, 90, 220, 90, 255);
+    }
+
+    // Population graph, bottom-left. Each series is scaled to its own cap.
+    draw_graph(world) {
+        let w = HISTORY_LENGTH * 2 + 8;
+        let h = 70;
+        let px = 10;
+        let py = VIEW_H - h - 10;
+        sdl_fill_rect(px, py, w, h, 14, 16, 26, 255);
+
+        self.draw_series(world.plant_history,  px, py, h,  90, 200,  90);
+        self.draw_series(world.rabbit_history, px, py, h, 240, 240, 240);
+        self.draw_series(world.fox_history,    px, py, h, 235, 120,  45);
+    }
+
+    draw_series(history, px, py, h, r, g, b) {
+        for (let i = 0; i < history.size(); i = i + 1) {
+            let v = clamp(history.at(i), 0, 1);
+            sdl_fill_rect(px + 4 + i * 2, py + h - 5 - v * (h - 10), 2, 2, r, g, b, 255);
+        }
+    }
+
+    // Top-left: speed pips and a season bar. Top-right: pause icon.
+    draw_hud(world, paused, speed_level) {
+        for (let i = 0; i < len(SPEEDS); i = i + 1) {
+            if (i <= speed_level) sdl_fill_rect(12 + i * 12, 12, 9, 9, 255, 255, 255, 255);
+            else                  sdl_fill_rect(12 + i * 12, 12, 9, 9, 70, 72, 84, 255);
+        }
+
+        let wave = world.season_wave();
+        sdl_fill_rect(12, 26, 62, 8, 14, 16, 26, 255);
+        sdl_fill_rect(13, 27, floor(wave * 60), 6,
+                      150 + floor(wave * 90), 190 + floor(wave * 10), 240 - floor(wave * 180), 255);
+
+        if (paused) {
+            sdl_fill_rect(VIEW_W - 34, 12, 8, 24, 255, 255, 255, 255);
+            sdl_fill_rect(VIEW_W - 20, 12, 8, 24, 255, 255, 255, 255);
+        }
+    }
+}
+
+
+// ----------------------------------------------------------------------------
+//  Main loop
+// ----------------------------------------------------------------------------
+
+fn run() {
+    sdl_init("Universe-0", VIEW_W, VIEW_H);
+
+    let world    = World();
+    let camera   = Camera();
+    let renderer = Renderer();
+
+    let paused    = false;
+    let speed     = 0;          // index into SPEEDS
+    let space_was = false;
+    let faster_was = false;
+    let slower_was = false;
+    let reset_was = false;
+    let running   = true;
+
+    while (running) {
+        if (sdl_poll() == "quit" || sdl_key_down("escape")) running = false;
+
+        // Keys that toggle or step act on the rising edge only.
+        let space = sdl_key_down("space");
+        if (space && !space_was) paused = !paused;
+        space_was = space;
+
+        let faster = sdl_key_down("e");
+        if (faster && !faster_was) speed = clamp(speed + 1, 0, len(SPEEDS) - 1);
+        faster_was = faster;
+
+        let slower = sdl_key_down("q");
+        if (slower && !slower_was) speed = clamp(speed - 1, 0, len(SPEEDS) - 1);
+        slower_was = slower;
+
+        let reset = sdl_key_down("r");
+        if (reset && !reset_was) world = World();
+        reset_was = reset;
+
+        camera.update();
+        if (!paused) {
+            for (let i = 0; i < SPEEDS[speed]; i = i + 1) {
+                world.step();
+            }
+        }
+
+        renderer.draw(world, camera, paused, speed);
+        sdl_delay(16);
+    }
+
+    sdl_quit();
+}
+
+run();
