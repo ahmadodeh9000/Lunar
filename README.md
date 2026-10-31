@@ -1,7 +1,7 @@
 # Lunar
 
 A dynamically-typed scripting language with a bytecode VM, written in C from scratch.
-Influenced by Lua and JavaScript. Built following [Crafting Interpreters](https://craftinginterpreters.com/) Part II, with extensions.
+Influenced by Lua and JavaScript. Built following [Crafting Interpreters](https://craftinginterpreters.com/) Part II, with extensions !
 
 Faster than CPython 3.14 and roughly 2-3x slower than Lua 5.4 on microbenchmarks ([details](#benchmarks)).
 
