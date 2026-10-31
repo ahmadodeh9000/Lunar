@@ -61,6 +61,13 @@ static Value sqrt_native(int argc, Value* args)  { if(argc!=1||!IS_NUMBER(args[0
 static Value abs_native(int argc, Value* args)   { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(fabs(AS_NUMBER(args[0]))); }
 static Value floor_native(int argc, Value* args) { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(floor(AS_NUMBER(args[0]))); }
 static Value ceil_native(int argc, Value* args)  { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(ceil(AS_NUMBER(args[0]))); }
+static Value sin_native(int argc, Value* args)   { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(sin(AS_NUMBER(args[0]))); }
+static Value cos_native(int argc, Value* args)   { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(cos(AS_NUMBER(args[0]))); }
+static Value tan_native(int argc, Value* args)   { if(argc!=1||!IS_NUMBER(args[0]))return NIL_VAL; return NUMBER_VAL(tan(AS_NUMBER(args[0]))); }
+static Value atan2_native(int argc, Value* args) { if(argc!=2||!IS_NUMBER(args[0])||!IS_NUMBER(args[1]))return NIL_VAL; return NUMBER_VAL(atan2(AS_NUMBER(args[0]),AS_NUMBER(args[1]))); }
+static Value pow_native(int argc, Value* args)   { if(argc!=2||!IS_NUMBER(args[0])||!IS_NUMBER(args[1]))return NIL_VAL; return NUMBER_VAL(pow(AS_NUMBER(args[0]),AS_NUMBER(args[1]))); }
+static Value min_native(int argc, Value* args)   { if(argc!=2||!IS_NUMBER(args[0])||!IS_NUMBER(args[1]))return NIL_VAL; return AS_NUMBER(args[0])<AS_NUMBER(args[1])?args[0]:args[1]; }
+static Value max_native(int argc, Value* args)   { if(argc!=2||!IS_NUMBER(args[0])||!IS_NUMBER(args[1]))return NIL_VAL; return AS_NUMBER(args[0])>AS_NUMBER(args[1])?args[0]:args[1]; }
 //static Value len_native(int argc, Value* args)   { if(argc!=1||!IS_STRING(args[0]))return NIL_VAL; return NUMBER_VAL((double)AS_STRING(args[0])->length); }
 static Value len_native(int argc, Value* args) {
     if (argc != 1) return NIL_VAL;
@@ -145,6 +152,13 @@ void register_std_natives() {
     define_native("abs",abs_native);
     define_native("floor",floor_native);
     define_native("ceil",ceil_native);
+    define_native("sin",sin_native);
+    define_native("cos",cos_native);
+    define_native("tan",tan_native);
+    define_native("atan2",atan2_native);
+    define_native("pow",pow_native);
+    define_native("min",min_native);
+    define_native("max",max_native);
     define_native("str",str_native);
     define_native("len",len_native);
     define_native("hex",hex_native);

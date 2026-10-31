@@ -462,6 +462,13 @@ print factorial(10);   // 3628800
 | `abs(x)`      | `(number) → number`          | Absolute value                                            |
 | `floor(x)`    | `(number) → number`          | Round toward negative infinity                            |
 | `ceil(x)`     | `(number) → number`          | Round toward positive infinity                            |
+| `sin(x)`      | `(number) → number`          | Sine, in radians                                          |
+| `cos(x)`      | `(number) → number`          | Cosine, in radians                                        |
+| `tan(x)`      | `(number) → number`          | Tangent, in radians                                       |
+| `atan2(y,x)`  | `(number, number) → number`  | Angle of the point `(x, y)`, in radians                   |
+| `pow(b,e)`    | `(number, number) → number`  | `b` raised to the power `e`                               |
+| `min(a,b)`    | `(number, number) → number`  | The smaller of two numbers                                |
+| `max(a,b)`    | `(number, number) → number`  | The larger of two numbers                                 |
 | `str(x)`      | `(value) → string`           | Convert a number, bool, nil, string, or array to a string |
 | `len(x)`      | `(string \| array) → number` | String length in bytes, or number of array elements       |
 | `push(a, v)`  | `(array, any) → array`       | Append `v` to `a`; returns the array, so calls chain      |

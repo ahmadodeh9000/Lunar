@@ -1,0 +1,15 @@
+// Prints FAIL for any wrong result, then "math: done".
+fn near(name, got, want) {
+    if (got == nil || abs(got - want) > 0.000001) print "FAIL " + name + ": " + str(got);
+}
+let PI = 3.14159265358979;
+near("sin", sin(PI / 2), 1);
+near("cos", cos(PI), -1);
+near("tan", tan(PI / 4), 1);
+near("atan2 quadrant", atan2(1, -1), 3 * PI / 4);
+near("pow", pow(2, 10), 1024);
+near("pow frac", pow(9, 0.5), 3);
+near("min", min(2, -3), -3);
+near("max", max(2, -3), 2);
+if (sin("x") != nil || min(1) != nil || max(1, "x") != nil || atan2(1) != nil) print "FAIL bad args should give nil";
+print "math: done";
