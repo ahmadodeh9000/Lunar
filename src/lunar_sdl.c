@@ -1,11 +1,16 @@
 #ifdef LUNAR_SDL
 
+#include <stdlib.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include "lunar_sdl.h"
 #include "vm.h"
 #include "value.h"
 #include "object.h"
+
+#if !SDL_VERSION_ATLEAST(2, 0, 18)
+#error "Lunar's triangle drawing needs SDL 2.0.18 or newer (SDL_RenderGeometry)"
+#endif
 
 static SDL_Window*      window      = NULL;
 static SDL_Renderer*    renderer    = NULL;
@@ -243,11 +248,166 @@ static Value sdl_fill_rect_native(int argc, Value* args) {
     return NIL_VAL;
 }
 
+/*================================
+  ==========TRIANGLES=============
+  ================================
+*/
+static bool all_numbers(i32 argc, Value* args, i32 want) {
+    if (argc < want) return false;
+    for (i32 i = 0; i < want; i++) {
+        if (!IS_NUMBER(args[i])) return false;
+    }
+    return true;
+}
+
+static Uint8 color_byte(Value v) {
+    double d = AS_NUMBER(v);
+    return d >= 255 ? 255 : d > 0 ? (Uint8)d : 0;
+}
+
+static SDL_Vertex solid_vertex(Value x, Value y, SDL_Color color) {
+    SDL_Vertex v = {{(float)AS_NUMBER(x), (float)AS_NUMBER(y)}, color, {0, 0}};
+    return v;
+}
+
+// sdl_draw_tri(x1,y1, x2,y2, x3,y3, r,g,b,a)
+static Value sdl_draw_tri_native(i32 argc, Value* args) {
+    if (!all_numbers(argc, args, 10) || renderer == NULL) return NIL_VAL;
+
+    SDL_Color color = {
+        color_byte(args[6]), color_byte(args[7]),
+        color_byte(args[8]), color_byte(args[9])
+    };
+    SDL_Vertex v[3] = {
+        solid_vertex(args[0], args[1], color),
+        solid_vertex(args[2], args[3], color),
+        solid_vertex(args[4], args[5], color),
+    };
+    SDL_RenderGeometry(renderer, NULL, v, 3, NULL, 0);
+    return NIL_VAL;
+}
+
+static SDL_Vertex textured_vertex(Value* a, SDL_Color color) {
+    SDL_Vertex v = {
+        {(float)AS_NUMBER(a[0]), (float)AS_NUMBER(a[1])}, color,
+        {(float)AS_NUMBER(a[2]), (float)AS_NUMBER(a[3])}
+    };
+    return v;
+}
+
+// sdl_draw_tri_tex(tex, x1,y1,u1,v1, x2,y2,u2,v2, x3,y3,u3,v3, shade)
+// UVs run 0-1 across the texture; shade 0-255 darkens it, 255 leaves it as is
+static Value sdl_draw_tri_tex_native(i32 argc, Value* args) {
+    if (!all_numbers(argc, args, 14) || renderer == NULL) return NIL_VAL;
+
+    i32 handle = (i32)AS_NUMBER(args[0]);
+    if (handle < 0 || handle >= texture_count) return NIL_VAL;
+
+    Uint8 c = color_byte(args[13]);
+    SDL_Color color = {c, c, c, 255};
+    SDL_Vertex v[3] = {
+        textured_vertex(args + 1, color),
+        textured_vertex(args + 5, color),
+        textured_vertex(args + 9, color),
+    };
+    SDL_RenderGeometry(renderer, textures[handle], v, 3, NULL, 0);
+    return NIL_VAL;
+}
+
+// reused between calls so a batched draw doesn't allocate every frame
+static SDL_Vertex* batch_verts = NULL;
+static i32 batch_verts_cap = 0;
+static int* batch_indices = NULL;
+static i32 batch_indices_cap = 0;
+
+#define VERTEX_STRIDE 5
+
+// sdl_draw_tris(tex, verts, vcount, indices, icount) -> triangles drawn, or nil
+// on a bad argument, in which case nothing is drawn.
+// tex: a texture handle, or -1 for untextured.
+// verts: flat array of vcount vertices, 5 numbers each: x, y, u, v, rgba, where
+//   rgba packs the color as r*16777216 + g*65536 + b*256 + a.
+// indices: array of vertex numbers, 3 per triangle, of which the first icount
+//   are used; or nil to draw vertices in order (icount is then ignored).
+// Triangles are drawn in order, later ones on top.
+static Value sdl_draw_tris_native(i32 argc, Value* args) {
+    if (argc < 5 || renderer == NULL) return NIL_VAL;
+    if (!IS_NUMBER(args[0]) || !IS_ARRAY(args[1]) || !IS_NUMBER(args[2]) || !IS_NUMBER(args[4])) return NIL_VAL;
+    if (!IS_ARRAY(args[3]) && !IS_NIL(args[3])) return NIL_VAL;
+
+    i32 handle = (i32)AS_NUMBER(args[0]);
+    if (handle != -1 && (handle < 0 || handle >= texture_count)) return NIL_VAL;
+    SDL_Texture* tex = handle == -1 ? NULL : textures[handle];
+
+    ValueArray* src = &AS_ARRAY(args[1])->items;
+    double vcount_d = AS_NUMBER(args[2]);
+    if (!(vcount_d >= 0) || vcount_d * VERTEX_STRIDE > src->count) return NIL_VAL;
+    i32 vcount = (i32)vcount_d;
+
+    if (vcount > batch_verts_cap) {
+        SDL_Vertex* grown = realloc(batch_verts, sizeof(SDL_Vertex) * vcount);
+        if (grown == NULL) return NIL_VAL;
+        batch_verts = grown;
+        batch_verts_cap = vcount;
+    }
+
+    Value* in = src->values;
+    for (i32 i = 0; i < vcount; i++, in += VERTEX_STRIDE) {
+        if (!IS_NUMBER(in[0]) || !IS_NUMBER(in[1]) || !IS_NUMBER(in[2]) ||
+            !IS_NUMBER(in[3]) || !IS_NUMBER(in[4])) return NIL_VAL;
+        double packed = AS_NUMBER(in[4]);
+        if (!(packed >= 0 && packed <= 4294967295.0)) return NIL_VAL;
+        Uint32 rgba = (Uint32)packed;
+        SDL_Vertex* out = &batch_verts[i];
+        out->position.x = (float)AS_NUMBER(in[0]);
+        out->position.y = (float)AS_NUMBER(in[1]);
+        out->tex_coord.x = (float)AS_NUMBER(in[2]);
+        out->tex_coord.y = (float)AS_NUMBER(in[3]);
+        out->color.r = (Uint8)(rgba >> 24);
+        out->color.g = (Uint8)(rgba >> 16);
+        out->color.b = (Uint8)(rgba >> 8);
+        out->color.a = (Uint8)rgba;
+    }
+
+    if (IS_NIL(args[3])) {
+        if (SDL_RenderGeometry(renderer, tex, batch_verts, vcount, NULL, 0) != 0) return NIL_VAL;
+        return NUMBER_VAL((double)(vcount / 3));
+    }
+
+    ValueArray* idx = &AS_ARRAY(args[3])->items;
+    double icount_d = AS_NUMBER(args[4]);
+    if (!(icount_d >= 0) || icount_d > idx->count) return NIL_VAL;
+    i32 icount = (i32)icount_d;
+
+    if (icount > batch_indices_cap) {
+        int* grown = realloc(batch_indices, sizeof(int) * icount);
+        if (grown == NULL) return NIL_VAL;
+        batch_indices = grown;
+        batch_indices_cap = icount;
+    }
+    for (i32 i = 0; i < icount; i++) {
+        if (!IS_NUMBER(idx->values[i])) return NIL_VAL;
+        double n = AS_NUMBER(idx->values[i]);
+        if (!(n >= 0 && n < vcount)) return NIL_VAL;
+        batch_indices[i] = (int)n;
+    }
+
+    if (SDL_RenderGeometry(renderer, tex, batch_verts, vcount, batch_indices, icount) != 0) return NIL_VAL;
+    return NUMBER_VAL((double)(icount / 3));
+}
+
 static Value sdl_quit_native(i32 argc, Value* args) {
     for (i32 i = 0; i < texture_count; i++) {
         SDL_DestroyTexture(textures[i]);
     }
     texture_count = 0;
+
+    free(batch_verts);
+    batch_verts = NULL;
+    batch_verts_cap = 0;
+    free(batch_indices);
+    batch_indices = NULL;
+    batch_indices_cap = 0;
 
     IMG_Quit();
     SDL_DestroyRenderer(renderer);
@@ -328,6 +488,9 @@ void register_sdl_natives() {
     define_native("sdl_present",        sdl_present_native);
     define_native("sdl_delay",          sdl_delay_native);
     define_native("sdl_fill_rect",      sdl_fill_rect_native);
+    define_native("sdl_draw_tri",       sdl_draw_tri_native);
+    define_native("sdl_draw_tri_tex",   sdl_draw_tri_tex_native);
+    define_native("sdl_draw_tris",      sdl_draw_tris_native);
     define_native("sdl_load_texture",   sdl_load_texture_native);
     define_native("sdl_draw_texture",   sdl_draw_texture_native);
     define_native("sdl_texture_width",  sdl_texture_width_native);

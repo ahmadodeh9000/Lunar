@@ -625,6 +625,35 @@ sdl_key_down("left")     // true if the key is currently held
                          // an unknown name is simply never down
 ```
 
+### Triangles
+
+Requires SDL 2.0.18 or newer. Textures are mapped without perspective correction, and there is no depth buffer: later triangles draw over earlier ones.
+
+```lunar
+sdl_draw_tri(x1,y1, x2,y2, x3,y3, r,g,b,a)   // solid color; alpha needs sdl_set_blend(true)
+
+// UVs run 0-1 across the texture; shade 0-255 darkens it, 255 leaves it as is
+sdl_draw_tri_tex(tex, x1,y1,u1,v1, x2,y2,u2,v2, x3,y3,u3,v3, shade)
+```
+
+To draw many triangles, batch them into one call. In one test of 8000 textured triangles it took about a third less frame time than one call per triangle:
+
+```lunar
+sdl_draw_tris(tex, verts, vcount, indices, icount)   // triangles drawn, or nil on a bad argument
+```
+
+- `tex` is a texture handle, or `-1` for untextured.
+- `verts` is a flat array with 5 numbers per vertex: `x, y, u, v, rgba`, where `rgba` is `r*16777216 + g*65536 + b*256 + a`. It can be longer than `vcount`, so one preallocated array can be reused.
+- `indices` lists vertex numbers, 3 per triangle, and only the first `icount` are used. Pass `nil` to draw vertices in order, 3 per triangle.
+- If any argument or element is invalid, or the count isn't a multiple of 3, nothing is drawn.
+
+```lunar
+// one textured quad: two triangles sharing an edge
+let WHITE = 255*16777216 + 255*65536 + 255*256 + 255;
+let verts = [10,10,0,0,WHITE,  110,10,1,0,WHITE,  110,110,1,1,WHITE,  10,110,0,1,WHITE];
+sdl_draw_tris(tex, verts, 4, [0,1,2, 0,2,3], 6);
+```
+
 ### Mouse
 
 ```lunar
