@@ -17,6 +17,10 @@ static const Uint8* keyboard        = NULL;
 static SDL_Texture* textures[MAX_TEXTURES];
 static i32 texture_count = 0;
 
+// mouse motion gathered by the latest sdl_poll
+static i32 mouse_dx = 0;
+static i32 mouse_dy = 0;
+
 
 static Value sdl_init_native(i32 argc, Value* args) {
     if (argc < 3) return BOOL_VAL(false);
@@ -203,6 +207,24 @@ static Value sdl_key_down_native(i32 argc, Value* args) {
     return BOOL_VAL(keyboard[code] != 0);
 }
 
+// sdl_set_relative_mouse(bool) -> true on success; hides the cursor and keeps
+// reporting motion past the window edges
+static Value sdl_set_relative_mouse_native(i32 argc, Value* args) {
+    if (argc < 1 || !IS_BOOL(args[0])) return BOOL_VAL(false);
+    return BOOL_VAL(SDL_SetRelativeMouseMode(AS_BOOL(args[0]) ? SDL_TRUE : SDL_FALSE) == 0);
+}
+
+static Value sdl_mouse_dx_native(i32 argc, Value* args) { return NUMBER_VAL((double)mouse_dx); }
+static Value sdl_mouse_dy_native(i32 argc, Value* args) { return NUMBER_VAL((double)mouse_dy); }
+
+// sdl_mouse_down(button): 1 left, 2 middle, 3 right
+static Value sdl_mouse_down_native(i32 argc, Value* args) {
+    if (argc < 1 || !IS_NUMBER(args[0])) return BOOL_VAL(false);
+    i32 button = (i32)AS_NUMBER(args[0]);
+    if (button < 1 || button > 5) return BOOL_VAL(false);
+    return BOOL_VAL((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(button)) != 0);
+}
+
 static Value sdl_fill_rect_native(int argc, Value* args) {
     if (argc < 8) return NIL_VAL;
     SDL_Rect rect = {
@@ -241,8 +263,14 @@ static Value sdl_poll_native(i32 argc, Value* args) {
     SDL_Event e;
     bool quit = false;
 
+    mouse_dx = 0;
+    mouse_dy = 0;
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT) quit = true;
+        if (e.type == SDL_MOUSEMOTION) {
+            mouse_dx += e.motion.xrel;
+            mouse_dy += e.motion.yrel;
+        }
     }
 
     return quit ? OBJ_VAL(copy_str("quit", 4)) : NIL_VAL;
@@ -304,6 +332,10 @@ void register_sdl_natives() {
     define_native("sdl_draw_texture",   sdl_draw_texture_native);
     define_native("sdl_texture_width",  sdl_texture_width_native);
     define_native("sdl_texture_height", sdl_texture_height_native);
+    define_native("sdl_set_relative_mouse", sdl_set_relative_mouse_native);
+    define_native("sdl_mouse_dx",       sdl_mouse_dx_native);
+    define_native("sdl_mouse_dy",       sdl_mouse_dy_native);
+    define_native("sdl_mouse_down",     sdl_mouse_down_native);
     define_native("sdl_time",           sdl_time_native);
     define_native("sdl_set_vsync",      sdl_set_vsync_native);
     define_native("sdl_set_blend",      sdl_set_blend_native);

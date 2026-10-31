@@ -625,6 +625,17 @@ sdl_key_down("left")     // true if the key is currently held
                          // an unknown name is simply never down
 ```
 
+### Mouse
+
+```lunar
+sdl_set_relative_mouse(true)  // hide the cursor and report motion past the window edges (FPS-style look)
+sdl_mouse_dx()                // pixels moved during the latest sdl_poll()
+sdl_mouse_dy()
+sdl_mouse_down(1)             // true if held; 1 left, 2 middle, 3 right
+```
+
+Motion is gathered by `sdl_poll()`, so call it once per frame before reading `sdl_mouse_dx` and `sdl_mouse_dy`.
+
 ### Timing
 
 ```lunar

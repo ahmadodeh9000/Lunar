@@ -1,0 +1,23 @@
+// Interactive: move the mouse and click for 5 seconds (or close the window).
+// Prints the total motion and each button that was seen held.
+sdl_init("sdl_mouse: move and click", 400, 300);
+sdl_set_relative_mouse(true);
+let total_x = 0;
+let total_y = 0;
+let left = false;
+let right = false;
+let start = sdl_time();
+let running = true;
+while (running && sdl_time() - start < 5) {
+    if (sdl_poll() == "quit") running = false;
+    total_x = total_x + sdl_mouse_dx();
+    total_y = total_y + sdl_mouse_dy();
+    if (sdl_mouse_down(1)) left = true;
+    if (sdl_mouse_down(3)) right = true;
+    sdl_clear(20, 20, 30);
+    sdl_present();
+}
+sdl_set_relative_mouse(false);
+if (sdl_mouse_down("x") != false || sdl_mouse_down(9) != false) print "FAIL bad args";
+sdl_quit();
+print "moved " + str(total_x) + ", " + str(total_y) + " left=" + str(left) + " right=" + str(right);
