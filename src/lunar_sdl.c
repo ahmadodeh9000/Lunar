@@ -230,14 +230,17 @@ static Value sdl_quit_native(i32 argc, Value* args) {
     return NIL_VAL;
 }
 
+// Drains the whole queue: scripts poll once per frame, and one event per call
+// lets mouse motion pile up in front of a quit.
 static Value sdl_poll_native(i32 argc, Value* args) {
     SDL_Event e;
+    bool quit = false;
 
-    if (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) return OBJ_VAL(copy_str("quit", 4));
+    while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_QUIT) quit = true;
     }
 
-    return NIL_VAL;
+    return quit ? OBJ_VAL(copy_str("quit", 4)) : NIL_VAL;
 }
 
 static Value sdl_clear_native(i32 argc, Value* args) {

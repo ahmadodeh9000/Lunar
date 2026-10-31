@@ -608,7 +608,7 @@ Textures are freed automatically on `sdl_quit()`. There is currently no way to u
 ### Input
 
 ```lunar
-let e = sdl_poll();      // "quit" | nil
+let e = sdl_poll();      // "quit" | nil; handles every pending event, call once per frame
 
 sdl_key_down("left")     // true if the key is currently held
                          // keys: "up" "down" "left" "right"
