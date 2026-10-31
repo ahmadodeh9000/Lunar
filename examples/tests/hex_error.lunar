@@ -1,0 +1,5 @@
+// A native that raises runtime_error must abort the script cleanly.
+// Expected: "Invalid hexadecimal string." and exit code 100. It used to segfault.
+print hex("ff");    // 255
+print hex("zz");
+print "not reached";

@@ -132,6 +132,7 @@ static bool call_value(Value callee, int argc) {
         case OBJ_NATIVE: {
             NativeFn fn=AS_NATIVE(callee);
             Value res=fn(argc,lvm.stack_top-argc);
+            if(lvm.frame_count==0) return false;   // the native raised runtime_error, which reset the stack
             lvm.stack_top-=argc+1; push(res); return true;
         }
         case OBJ_STRUCT: {
@@ -156,6 +157,7 @@ static bool call_value(Value callee, int argc) {
             
             // Invoke the FFI engine directly!
             Value result = ffi_call_bound(func, argc,args);
+            if (lvm.frame_count == 0) return false;   // runtime_error reset the stack
             
             // Wind down the stack frame: pop args and the function object itself
             lvm.stack_top -= argc + 1;
