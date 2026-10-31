@@ -1,5 +1,5 @@
 
-// ---------- tests, appended to minecraft.lunar by run_tests.sh ----------
+// ---------- tests, placed inside game() by run_tests.sh ----------
 
 fn check(name, ok) {
     if (!ok) print "FAIL " + name;
@@ -80,8 +80,8 @@ fn test_physics() {
 }
 
 fn test_world() {
-    clear_world();
     generate_world();
+    build_all_chunks();
     let solid = 0;
     for (let i = 0; i < len(world); i = i + 1) { if (world[i] != AIR) solid = solid + 1; }
     check("world has terrain", solid > SXZ * 2);
@@ -91,6 +91,101 @@ fn test_world() {
     check("spawn stands on ground", on_ground);
 }
 
+fn aim(x, y, z, new_yaw, new_pitch) {
+    eye_x = x; eye_y = y; eye_z = z;
+    yaw = new_yaw; pitch = new_pitch;
+    update_camera();
+    raycast();
+}
+
+fn count_faces(ci) { ret len(chunk_faces[ci]) / FACE_STRIDE; }
+
+fn test_raycast() {
+    clear_world();
+    set_block(10, 5, 5, STONE);
+
+    aim(10.5, 5.5, 8.5, 0, 0);          // facing -z
+    check("hits the block ahead", ray_hit && hit_x == 10 && hit_y == 5 && hit_z == 5);
+    check("hit the +z face", hit_dir == 4);
+    check("air cell is in front", prev_x == 10 && prev_y == 5 && prev_z == 6);
+
+    aim(10.5, 5.5, 8.5, 3.14159265, 0); // facing +z
+    check("misses behind the camera", !ray_hit);
+
+    aim(10.5, 5.5, 13.5, 0, 0);         // 8 blocks away
+    check("misses beyond reach", !ray_hit);
+
+    aim(10.5, 8.5, 5.5, 0, -1.55);      // looking almost straight down
+    check("hits from above", ray_hit && hit_dir == 2 && hit_y == 5);
+
+    aim(12.5, 5.5, 5.5, -1.5707963, 0); // facing -x
+    check("hits the +x face", ray_hit && hit_dir == 0 && prev_x == 11);
+}
+
+fn test_editing() {
+    clear_world();
+    set_floor(0);
+    set_floor(1);
+    for (let i = 0; i < len(chunk_faces); i = i + 1) build_chunk(i);
+    px = 20.5; py = 2.01; pz = 20.5;
+    selected_block = BRICK;
+
+    // the block at x = 7 sits on the border between chunks 0 and 1
+    let before0 = count_faces(0);
+    aim(7.5, 5.5, 3.5, 0, -1.55);
+    check("targets the floor", ray_hit && hit_x == 7 && hit_y == 1 && hit_z == 3);
+    check("place works", place_block() && get_block(7, 2, 3) == BRICK);
+    check("place adds faces", count_faces(0) == before0 + 4);
+
+    aim(7.5, 5.5, 3.5, 0, -1.55);
+    let before1 = count_faces(1);
+    check("break works", break_block() && get_block(7, 2, 3) == AIR);
+    check("break restores faces", count_faces(0) == before0);
+
+    // digging at the border exposes a side wall in the neighboring chunk
+    aim(7.5, 5.5, 3.5, 0, -1.55);
+    check("dig works", break_block() && get_block(7, 1, 3) == AIR);
+    check("neighbor chunk rebuilt", count_faces(1) == before1 + 1);
+
+    aim(7.5, 5.5, 3.5, 0, -1.55);
+    check("reaches the bottom layer", ray_hit && hit_y == 0);
+    check("bottom layer can't be broken", !break_block() && get_block(7, 0, 3) != AIR);
+
+    px = 7.5; py = 1; pz = 3.5;         // stand in the hole, then try to fill it
+    aim(7.5, 5.5, 3.5, 0, -1.55);
+    check("can't place inside the player", !place_block());
+}
+
+fn test_near_clip() {
+    update_colors(1);
+    clear_world();
+    set_block(10, 5, 10, STONE);
+    build_chunk(floor(10 / CHUNK) + floor(10 / CHUNK) * CHUNKS_X);
+    // Eye a hair off the +z face, looking along it so it crosses the near plane.
+    eye_x = 10.5; eye_y = 5.5; eye_z = 11.02;
+    yaw = 0.8; pitch = 0;
+    update_camera();
+    quad_count = 0;
+    project_chunk(chunk_faces[floor(10 / CHUNK) + floor(10 / CHUNK) * CHUNKS_X]);
+    check("near face still emits", quad_count > 0);
+    sort_quads();
+    for (let i = 0; i < quad_count * QUAD_STRIDE; i = i + VERT_STRIDE) {
+        let x = verts[i];
+        check("clipped vertex is finite", x == x && x > -1000000 && x < 1000000);
+    }
+    let seen = [];
+    for (let i = 0; i < quad_count * 4; i = i + 1) push(seen, 0);
+    for (let i = 0; i < quad_count * 6; i = i + 1) seen[indices[i]] = 1;
+    let missing = 0;
+    for (let i = 0; i < quad_count * 4; i = i + 1) { if (seen[i] == 0) missing = missing + 1; }
+    check("sort writes every quad", missing == 0);
+}
+
 test_world();
+init_render_buffers();
+init_clip_buffers();
 test_physics();
+test_raycast();
+test_editing();
+test_near_clip();
 print "game tests: done";

@@ -6,774 +6,930 @@
 //
 // Lunar's bitwise operators bind tighter than arithmetic, and | binds tighter than
 // & , the reverse of C, so bitwise expressions are always fully parenthesized.
+//
+// The whole game lives inside game() because a chunk holds at most 256 constants, and
+// at the top level every global's name and every function takes some. As locals of
+// game() they take none, and functions reach them as upvalues, which are also faster
+// than globals. The catch: a function can only use what is defined above it.
 
-let WIN_W = 960;
-let WIN_H = 600;
-let FOV_DEGREES = 70;
-let NEAR = 0.05;
-let RENDER_RADIUS = 26;
-let SUBDIVIDE_DIST = 4;     // faces closer than this are split, to hide affine texture warp
-let SUBDIVISIONS = 4;
-let MAX_QUADS = 9000;
+fn game() {
+    let WIN_W = 960;
+    let WIN_H = 600;
+    let FOV_DEGREES = 70;
+    let NEAR = 0.05;
+    let RENDER_RADIUS = 26;
+    let SUBDIVIDE_DIST = 4;     // faces closer than this are split, to hide affine texture warp
+    let SUBDIVISIONS = 4;
+    let MAX_QUADS = 9000;
 
-// Set above 0 to fly a scripted benchmark for that many seconds, uncapped, then exit.
-let DEMO_SECONDS = 0;
+    // Set above 0 to fly a scripted benchmark for that many seconds, uncapped, then exit.
+    let DEMO_SECONDS = 0;
 
-// ---------- world ----------
+    // ---------- world ----------
 
-let SX = 32;
-let SY = 16;
-let SZ = 32;
-let SXZ = SX * SZ;
-let CHUNK = 8;
-let CHUNKS_X = SX / CHUNK;
-let CHUNKS_Z = SZ / CHUNK;
+    let SX = 32;
+    let SY = 16;
+    let SZ = 32;
+    let SXZ = SX * SZ;
+    let CHUNK = 8;
+    let CHUNKS_X = SX / CHUNK;
+    let CHUNKS_Z = SZ / CHUNK;
 
-let AIR = 0;
-let GRASS = 1;
-let DIRT = 2;
-let STONE = 3;
-let LOG = 4;
-let LEAVES = 5;
-let SAND = 6;
-let PLANKS = 7;
-let BRICK = 8;
+    let AIR = 0;
+    let GRASS = 1;
+    let DIRT = 2;
+    let STONE = 3;
+    let LOG = 4;
+    let LEAVES = 5;
+    let SAND = 6;
+    let PLANKS = 7;
+    let BRICK = 8;
 
-// atlas tile of each block type, indexed by block
-let TILE_TOP  = [0, 0, 2, 3, 5, 6, 7, 8, 9];
-let TILE_SIDE = [0, 1, 2, 3, 4, 6, 7, 8, 9];
-let TILE_BOT  = [0, 2, 2, 3, 5, 6, 7, 8, 9];
-let TILE_HIGHLIGHT = 14;
+    // atlas tile of each block type, indexed by block
+    let TILE_TOP  = [0, 0, 2, 3, 5, 6, 7, 8, 9];
+    let TILE_SIDE = [0, 1, 2, 3, 4, 6, 7, 8, 9];
+    let TILE_BOT  = [0, 2, 2, 3, 5, 6, 7, 8, 9];
+    let TILE_HIGHLIGHT = 14;
 
-let world = [];
-let chunk_faces = [];
+    let world = [];
+    let chunk_faces = [];
 
-// Values stay under 2^31 at every step: an out-of-range double saturates or wraps
-// depending on the platform when bitwise operators truncate it.
-fn hash2(x, z, seed) {
-    let h = ((x * 3571) + (z * 6151) + seed) & 65535;
-    h = ((h * 25173) + 13849) & 65535;
-    h = h ^ (h >> 7);
-    h = ((h * 25173) + 13849) & 65535;
-    ret h / 65535;
-}
-
-fn value_noise(x, z, scale, seed) {
-    let fx = x / scale;
-    let fz = z / scale;
-    let ix = floor(fx);
-    let iz = floor(fz);
-    let tx = fx - ix;
-    let tz = fz - iz;
-    tx = tx * tx * (3 - 2 * tx);
-    tz = tz * tz * (3 - 2 * tz);
-    let a = hash2(ix, iz, seed);
-    let b = hash2(ix + 1, iz, seed);
-    let c = hash2(ix, iz + 1, seed);
-    let d = hash2(ix + 1, iz + 1, seed);
-    let top = a + (b - a) * tx;
-    let bot = c + (d - c) * tx;
-    ret top + (bot - top) * tz;
-}
-
-fn terrain_height(x, z) {
-    let h = 2 + 6 * value_noise(x, z, 9, 11) + 3 * value_noise(x, z, 4, 97);
-    ret min(9, max(2, floor(h)));
-}
-
-fn set_block(x, y, z, b) { world[x + z * SX + y * SXZ] = b; }
-
-fn in_world(x, y, z) {
-    ret x >= 0 && x < SX && y >= 0 && y < SY && z >= 0 && z < SZ;
-}
-
-fn get_block(x, y, z) {
-    if (!in_world(x, y, z)) ret AIR;
-    ret world[x + z * SX + y * SXZ];
-}
-
-fn place_leaf(x, y, z) {
-    if (in_world(x, y, z) && get_block(x, y, z) == AIR) set_block(x, y, z, LEAVES);
-}
-
-fn place_leaf_square(cx, y, cz, r) {
-    for (let dz = -r; dz <= r; dz = dz + 1) {
-        for (let dx = -r; dx <= r; dx = dx + 1) {
-            place_leaf(cx + dx, y, cz + dz);
-        }
+    // Values stay under 2^31 at every step: an out-of-range double saturates or wraps
+    // depending on the platform when bitwise operators truncate it.
+    fn hash2(x, z, seed) {
+        let h = ((x * 3571) + (z * 6151) + seed) & 65535;
+        h = ((h * 25173) + 13849) & 65535;
+        h = h ^ (h >> 7);
+        h = ((h * 25173) + 13849) & 65535;
+        ret h / 65535;
     }
-}
 
-fn place_tree(x, ground, z) {
-    let top = ground + 4;
-    place_leaf_square(x, top - 1, z, 2);
-    place_leaf_square(x, top, z, 2);
-    place_leaf_square(x, top + 1, z, 1);
-    place_leaf(x, top + 2, z);
-    for (let y = ground + 1; y <= top; y = y + 1) set_block(x, y, z, LOG);
-}
-
-fn generate_world() {
-    for (let i = 0; i < SXZ * SY; i = i + 1) push(world, AIR);
-    for (let z = 0; z < SZ; z = z + 1) {
-        for (let x = 0; x < SX; x = x + 1) {
-            let h = terrain_height(x, z);
-            for (let y = 0; y <= h; y = y + 1) {
-                let b = STONE;
-                if (y == h) { if (h <= 3) b = SAND; else b = GRASS; }
-                else if (y >= h - 2) { if (h <= 3) b = SAND; else b = DIRT; }
-                set_block(x, y, z, b);
-            }
-        }
+    fn value_noise(x, z, scale, seed) {
+        let fx = x / scale;
+        let fz = z / scale;
+        let ix = floor(fx);
+        let iz = floor(fz);
+        let tx = fx - ix;
+        let tz = fz - iz;
+        tx = tx * tx * (3 - 2 * tx);
+        tz = tz * tz * (3 - 2 * tz);
+        let a = hash2(ix, iz, seed);
+        let b = hash2(ix + 1, iz, seed);
+        let c = hash2(ix, iz + 1, seed);
+        let d = hash2(ix + 1, iz + 1, seed);
+        let top = a + (b - a) * tx;
+        let bot = c + (d - c) * tx;
+        ret top + (bot - top) * tz;
     }
-    place_trees();
-}
 
-// One candidate tree per cell of a coarse grid, so trees spread out instead of clumping.
-fn place_trees() {
-    let cell = 7;
-    for (let cz = 0; cz + cell <= SZ; cz = cz + cell) {
-        for (let cx = 0; cx + cell <= SX; cx = cx + cell) {
-            let x = cx + 2 + floor(hash2(cx, cz, 501) * (cell - 3));
-            let z = cz + 2 + floor(hash2(cz, cx, 907) * (cell - 3));
-            let h = terrain_height(x, z);
-            if (h > 3 && hash2(cx + 3, cz + 5, 4242) > 0.3) place_tree(x, h, z);
-        }
+    fn terrain_height(x, z) {
+        let h = 2 + 6 * value_noise(x, z, 9, 11) + 3 * value_noise(x, z, 4, 97);
+        ret min(9, max(2, floor(h)));
     }
-}
 
-// ---------- face list ----------
+    fn set_block(x, y, z, b) { world[x + z * SX + y * SXZ] = b; }
 
-// A chunk's faces are a flat array of records: x, y, z, dir, tile, plane. Directions
-// are +X -X +Y -Y +Z -Z. A face is front-facing when CAM_PLANE[dir] > plane.
-let FACE_STRIDE = 6;
-
-// Is this neighbor hiding a face? Outside the sides and top of the world counts as
-// open, so the world's edges have walls; below it counts as solid, so no underside.
-fn hides_face(x, y, z) {
-    if (y < 0) ret true;
-    if (y >= SY || x < 0 || x >= SX || z < 0 || z >= SZ) ret false;
-    ret world[x + z * SX + y * SXZ] != AIR;
-}
-
-fn add_face(out, x, y, z, dir, tile, plane) {
-    push(out, x); push(out, y); push(out, z); push(out, dir); push(out, tile); push(out, plane);
-}
-
-fn build_chunk(ci) {
-    let out = [];
-    let x0 = (ci % CHUNKS_X) * CHUNK;
-    let z0 = floor(ci / CHUNKS_X) * CHUNK;
-    for (let y = 0; y < SY; y = y + 1) {
-        for (let z = z0; z < z0 + CHUNK; z = z + 1) {
-            for (let x = x0; x < x0 + CHUNK; x = x + 1) {
-                let b = world[x + z * SX + y * SXZ];
-                if (b != AIR) {
-                    let side = TILE_SIDE[b];
-                    if (!hides_face(x + 1, y, z)) add_face(out, x, y, z, 0, side, x + 1);
-                    if (!hides_face(x - 1, y, z)) add_face(out, x, y, z, 1, side, -x);
-                    if (!hides_face(x, y + 1, z)) add_face(out, x, y, z, 2, TILE_TOP[b], y + 1);
-                    if (!hides_face(x, y - 1, z)) add_face(out, x, y, z, 3, TILE_BOT[b], -y);
-                    if (!hides_face(x, y, z + 1)) add_face(out, x, y, z, 4, side, z + 1);
-                    if (!hides_face(x, y, z - 1)) add_face(out, x, y, z, 5, side, -z);
-                }
-            }
-        }
+    fn in_world(x, y, z) {
+        ret x >= 0 && x < SX && y >= 0 && y < SY && z >= 0 && z < SZ;
     }
-    chunk_faces[ci] = out;
-}
 
-fn build_all_chunks() {
-    for (let i = 0; i < CHUNKS_X * CHUNKS_Z; i = i + 1) {
-        push(chunk_faces, nil);
-        build_chunk(i);
+    fn get_block(x, y, z) {
+        if (!in_world(x, y, z)) ret AIR;
+        ret world[x + z * SX + y * SXZ];
     }
-}
 
-// ---------- camera ----------
-
-let EYE_HEIGHT = 1.62;
-let eye_x = 0;
-let eye_y = 0;
-let eye_z = 0;
-let yaw = 2.35;
-let pitch = -0.2;
-
-let FOCAL = (WIN_H / 2) / tan(FOV_DEGREES * 3.14159265 / 360);
-let CX = WIN_W / 2;
-let CY = WIN_H / 2;
-let CULL_SLOPE = (WIN_W / 2) / FOCAL * 1.05;
-let CULL_SLOPE_Y = (WIN_H / 2) / FOCAL * 1.05;
-
-// Camera basis, in world coordinates: right, up, forward.
-let rgt_x = 1; let rgt_y = 0; let rgt_z = 0;
-let up_x = 0;  let up_y = 1;  let up_z = 0;
-let fwd_x = 0; let fwd_y = 0; let fwd_z = -1;
-
-// Each direction's first corner relative to its block, then the edges along the
-// tile's u and v axes.
-let FACE_DEFS = [
-    1,1,1,  0,0,-1,  0,-1,0,
-    0,1,0,  0,0,1,   0,-1,0,
-    0,1,0,  1,0,0,   0,0,1,
-    0,0,1,  1,0,0,   0,0,-1,
-    0,1,1,  1,0,0,   0,-1,0,
-    1,1,0,  -1,0,0,  0,-1,0,
-];
-// FACE_DEFS rotated into view space, refreshed each frame.
-let view_defs = [];
-let CAM_PLANE = [0, 0, 0, 0, 0, 0];
-
-fn update_camera() {
-    let sy = sin(yaw);
-    let cy = cos(yaw);
-    let sp = sin(pitch);
-    let cp = cos(pitch);
-    rgt_x = cy;      rgt_y = 0;   rgt_z = sy;
-    up_x = -sy * sp; up_y = cp;   up_z = cy * sp;
-    fwd_x = sy * cp; fwd_y = sp;  fwd_z = -cy * cp;
-
-    for (let i = 0; i < 54; i = i + 3) {
-        let x = FACE_DEFS[i];
-        let y = FACE_DEFS[i + 1];
-        let z = FACE_DEFS[i + 2];
-        view_defs[i]     = x * rgt_x + y * rgt_y + z * rgt_z;
-        view_defs[i + 1] = x * up_x + y * up_y + z * up_z;
-        view_defs[i + 2] = x * fwd_x + y * fwd_y + z * fwd_z;
+    fn place_leaf(x, y, z) {
+        if (in_world(x, y, z) && get_block(x, y, z) == AIR) set_block(x, y, z, LEAVES);
     }
-    CAM_PLANE[0] = eye_x;  CAM_PLANE[1] = -eye_x;
-    CAM_PLANE[2] = eye_y;  CAM_PLANE[3] = -eye_y;
-    CAM_PLANE[4] = eye_z;  CAM_PLANE[5] = -eye_z;
-}
 
-// ---------- player ----------
-
-let PLAYER_HALF_WIDTH = 0.3;
-let PLAYER_HEIGHT = 1.8;
-let COLLISION_GAP = 0.001;
-let WALK_SPEED = 4.6;
-let JUMP_SPEED = 7.8;
-let GRAVITY = 24;
-let MAX_FALL = 30;
-let MOUSE_SENSITIVITY = 0.0025;
-let MAX_PITCH = 1.55;
-
-let px = 0;
-let py = 0;
-let pz = 0;
-let vel_y = 0;
-let on_ground = false;
-
-// Unlike hides_face, this treats the world's sides as walls so the player stays inside.
-fn blocked(x, y, z) {
-    if (y < 0) ret true;
-    if (y >= SY) ret false;
-    if (x < 0 || x >= SX || z < 0 || z >= SZ) ret true;
-    ret world[x + z * SX + y * SXZ] != AIR;
-}
-
-fn box_hits_world(x, y, z) {
-    let hw = PLAYER_HALF_WIDTH;
-    let x1 = floor(x + hw);
-    let y1 = floor(y + PLAYER_HEIGHT);
-    let z1 = floor(z + hw);
-    for (let by = floor(y); by <= y1; by = by + 1) {
-        for (let bz = floor(z - hw); bz <= z1; bz = bz + 1) {
-            for (let bx = floor(x - hw); bx <= x1; bx = bx + 1) {
-                if (blocked(bx, by, bz)) ret true;
-            }
-        }
-    }
-    ret false;
-}
-
-fn move_axis_x(dx) {
-    if (dx == 0) ret;
-    let nx = px + dx;
-    if (box_hits_world(nx, py, pz)) {
-        if (dx > 0) nx = floor(nx + PLAYER_HALF_WIDTH) - PLAYER_HALF_WIDTH - COLLISION_GAP;
-        else nx = floor(nx - PLAYER_HALF_WIDTH) + 1 + PLAYER_HALF_WIDTH + COLLISION_GAP;
-        if (box_hits_world(nx, py, pz)) nx = px;
-    }
-    px = nx;
-}
-
-fn move_axis_z(dz) {
-    if (dz == 0) ret;
-    let nz = pz + dz;
-    if (box_hits_world(px, py, nz)) {
-        if (dz > 0) nz = floor(nz + PLAYER_HALF_WIDTH) - PLAYER_HALF_WIDTH - COLLISION_GAP;
-        else nz = floor(nz - PLAYER_HALF_WIDTH) + 1 + PLAYER_HALF_WIDTH + COLLISION_GAP;
-        if (box_hits_world(px, py, nz)) nz = pz;
-    }
-    pz = nz;
-}
-
-fn move_axis_y(dy) {
-    on_ground = false;
-    let ny = py + dy;
-    if (box_hits_world(px, ny, pz)) {
-        if (dy < 0) {
-            ny = floor(ny) + 1 + COLLISION_GAP;
-            on_ground = true;
-        } else {
-            ny = floor(ny + PLAYER_HEIGHT) - PLAYER_HEIGHT - COLLISION_GAP;
-        }
-        vel_y = 0;
-        if (box_hits_world(px, ny, pz)) ny = py;
-    }
-    py = ny;
-}
-
-// forward and strafe are -1, 0 or 1. Each axis resolves on its own, which lets the
-// player slide along walls.
-fn step_player(dt, forward, strafe, jump) {
-    let sy = sin(yaw);
-    let cy = cos(yaw);
-    let wx = sy * forward + cy * strafe;
-    let wz = -cy * forward + sy * strafe;
-    let wish = sqrt(wx * wx + wz * wz);
-    if (wish > 0) {
-        wx = wx / wish * WALK_SPEED;
-        wz = wz / wish * WALK_SPEED;
-    }
-    if (jump && on_ground) vel_y = JUMP_SPEED;
-    vel_y = max(vel_y - GRAVITY * dt, -MAX_FALL);
-    move_axis_x(wx * dt);
-    move_axis_z(wz * dt);
-    move_axis_y(vel_y * dt);
-}
-
-fn look(dx, dy) {
-    yaw = yaw + dx * MOUSE_SENSITIVITY;
-    pitch = min(MAX_PITCH, max(-MAX_PITCH, pitch - dy * MOUSE_SENSITIVITY));
-}
-
-fn sync_eye() {
-    eye_x = px;
-    eye_y = py + EYE_HEIGHT;
-    eye_z = pz;
-}
-
-// Starts on the open ground nearest the middle of the world, not on a treetop.
-fn spawn_player() {
-    let mid_x = SX / 2;
-    let mid_z = SZ / 2;
-    for (let r = 0; r < SX / 2; r = r + 1) {
+    fn place_leaf_square(cx, y, cz, r) {
         for (let dz = -r; dz <= r; dz = dz + 1) {
             for (let dx = -r; dx <= r; dx = dx + 1) {
-                let h = terrain_height(mid_x + dx, mid_z + dz);
-                if (get_block(mid_x + dx, h, mid_z + dz) == GRASS &&
-                    get_block(mid_x + dx, h + 1, mid_z + dz) == AIR) {
-                    px = mid_x + dx + 0.5;
-                    py = h + 1 + COLLISION_GAP;
-                    pz = mid_z + dz + 0.5;
-                    ret;
+                place_leaf(cx + dx, y, cz + dz);
+            }
+        }
+    }
+
+    fn place_tree(x, ground, z) {
+        let top = ground + 4;
+        place_leaf_square(x, top - 1, z, 2);
+        place_leaf_square(x, top, z, 2);
+        place_leaf_square(x, top + 1, z, 1);
+        place_leaf(x, top + 2, z);
+        for (let y = ground + 1; y <= top; y = y + 1) set_block(x, y, z, LOG);
+    }
+
+    // One candidate tree per cell of a coarse grid, so trees spread out instead of clumping.
+    fn place_trees() {
+        let cell = 7;
+        for (let cz = 0; cz + cell <= SZ; cz = cz + cell) {
+            for (let cx = 0; cx + cell <= SX; cx = cx + cell) {
+                let x = cx + 2 + floor(hash2(cx, cz, 501) * (cell - 3));
+                let z = cz + 2 + floor(hash2(cz, cx, 907) * (cell - 3));
+                let h = terrain_height(x, z);
+                if (h > 3 && hash2(cx + 3, cz + 5, 4242) > 0.3) place_tree(x, h, z);
+            }
+        }
+    }
+
+    fn generate_world() {
+        for (let i = 0; i < SXZ * SY; i = i + 1) push(world, AIR);
+        for (let z = 0; z < SZ; z = z + 1) {
+            for (let x = 0; x < SX; x = x + 1) {
+                let h = terrain_height(x, z);
+                for (let y = 0; y <= h; y = y + 1) {
+                    let b = STONE;
+                    if (y == h) { if (h <= 3) b = SAND; else b = GRASS; }
+                    else if (y >= h - 2) { if (h <= 3) b = SAND; else b = DIRT; }
+                    set_block(x, y, z, b);
                 }
             }
         }
+        place_trees();
     }
-    px = mid_x + 0.5;
-    py = SY;
-    pz = mid_z + 0.5;
-}
 
-// ---------- rendering ----------
+    // ---------- face list ----------
 
-let ATLAS_GRID = 4;
-let TILE_SIZE = 1 / ATLAS_GRID;
-let UV_INSET = 0.002;        // keeps sampling from bleeding into the next tile
-let TILE_DU = TILE_SIZE - 2 * UV_INSET;
-let TILE_U = [];
-let TILE_V = [];
+    // A chunk's faces are a flat array of records: x, y, z, dir, tile, plane. Directions
+    // are +X -X +Y -Y +Z -Z. A face is front-facing when CAM_PLANE[dir] > plane.
+    let FACE_STRIDE = 6;
 
-let VERT_STRIDE = 5;
-let QUAD_STRIDE = 20;
-let verts = [];
-let indices = [];
-let quad_keys = [];
-let quad_count = 0;
-let NUM_BUCKETS = 128;
-let bucket_counts = [];
-
-// Packed vertex colors for each direction's shade, at each fog level.
-let FOG_LEVELS = 16;
-let FOG_START = RENDER_RADIUS * 0.75;
-let FOG_SCALE = FOG_LEVELS / (RENDER_RADIUS * RENDER_RADIUS - FOG_START * FOG_START);
-let DIR_SHADE = [0.72, 0.72, 1.0, 0.5, 0.85, 0.85];
-let colors = [];
-
-fn pack_rgba(r, g, b, a) { ret floor(r) * 16777216 + floor(g) * 65536 + floor(b) * 256 + floor(a); }
-
-fn init_render_buffers() {
-    for (let i = 0; i < ATLAS_GRID * ATLAS_GRID; i = i + 1) {
-        push(TILE_U, (i % ATLAS_GRID) * TILE_SIZE + UV_INSET);
-        push(TILE_V, floor(i / ATLAS_GRID) * TILE_SIZE + UV_INSET);
+    // Is this neighbor hiding a face? Outside the sides and top of the world counts as
+    // open, so the world's edges have walls; below it counts as solid, so no underside.
+    fn hides_face(x, y, z) {
+        if (y < 0) ret true;
+        if (y >= SY || x < 0 || x >= SX || z < 0 || z >= SZ) ret false;
+        ret world[x + z * SX + y * SXZ] != AIR;
     }
-    for (let i = 0; i < MAX_QUADS * QUAD_STRIDE; i = i + 1) push(verts, 0);
-    for (let i = 0; i < MAX_QUADS * 6; i = i + 1) push(indices, 0);
-    for (let i = 0; i < MAX_QUADS; i = i + 1) push(quad_keys, 0);
-    for (let i = 0; i < NUM_BUCKETS; i = i + 1) push(bucket_counts, 0);
-    for (let i = 0; i < 54; i = i + 1) push(view_defs, 0);
-    for (let i = 0; i < 6 * FOG_LEVELS; i = i + 1) push(colors, 0);
-}
 
-fn update_colors(light) {
-    let k = 0;
-    for (let d = 0; d < 6; d = d + 1) {
-        let c = 255 * DIR_SHADE[d] * light;
-        for (let f = 0; f < FOG_LEVELS; f = f + 1) {
-            colors[k] = pack_rgba(c, c, c, 255 * (1 - f / (FOG_LEVELS - 1)));
-            k = k + 1;
-        }
+    fn add_face(out, x, y, z, dir, tile, plane) {
+        push(out, x); push(out, y); push(out, z); push(out, dir); push(out, tile); push(out, plane);
     }
-}
 
-// Sutherland-Hodgman buffers: view x, y, z, u, v per polygon corner.
-let poly_in = [];
-let poly_out = [];
-fn init_clip_buffers() {
-    for (let i = 0; i < 40; i = i + 1) { push(poly_in, 0); push(poly_out, 0); }
-}
-
-fn write_vertex(k, vx, vy, vz, u, v, color) {
-    let iz = FOCAL / vz;
-    verts[k] = CX + vx * iz;
-    verts[k + 1] = CY - vy * iz;
-    verts[k + 2] = u;
-    verts[k + 3] = v;
-    verts[k + 4] = color;
-}
-
-// Writes polygon corner `c` as vertex slot `slot` of quad `q`.
-fn write_poly_vertex(q, slot, c, color) {
-    let p = c * VERT_STRIDE;
-    write_vertex(q * QUAD_STRIDE + slot * VERT_STRIDE,
-                 poly_out[p], poly_out[p + 1], poly_out[p + 2], poly_out[p + 3], poly_out[p + 4], color);
-}
-
-// Clips a quad of poly_in against the near plane, emitting 0, 1 or 2 quads. A
-// clipped quad has 3 to 5 corners; a triangle repeats its last corner to stay a quad.
-fn emit_clipped_quad(key, color) {
-    let n = 0;
-    for (let i = 0; i < 4; i = i + 1) {
-        let a = i * VERT_STRIDE;
-        let b = ((i + 1) % 4) * VERT_STRIDE;
-        let za = poly_in[a + 2];
-        let zb = poly_in[b + 2];
-        if (za >= NEAR) {
-            for (let j = 0; j < VERT_STRIDE; j = j + 1) poly_out[n + j] = poly_in[a + j];
-            n = n + VERT_STRIDE;
-        }
-        if ((za >= NEAR) != (zb >= NEAR)) {
-            let t = (NEAR - za) / (zb - za);
-            for (let j = 0; j < VERT_STRIDE; j = j + 1) {
-                poly_out[n + j] = poly_in[a + j] + (poly_in[b + j] - poly_in[a + j]) * t;
+    fn build_chunk(ci) {
+        let out = [];
+        let x0 = (ci % CHUNKS_X) * CHUNK;
+        let z0 = floor(ci / CHUNKS_X) * CHUNK;
+        for (let y = 0; y < SY; y = y + 1) {
+            for (let z = z0; z < z0 + CHUNK; z = z + 1) {
+                for (let x = x0; x < x0 + CHUNK; x = x + 1) {
+                    let b = world[x + z * SX + y * SXZ];
+                    if (b != AIR) {
+                        let side = TILE_SIDE[b];
+                        if (!hides_face(x + 1, y, z)) add_face(out, x, y, z, 0, side, x + 1);
+                        if (!hides_face(x - 1, y, z)) add_face(out, x, y, z, 1, side, -x);
+                        if (!hides_face(x, y + 1, z)) add_face(out, x, y, z, 2, TILE_TOP[b], y + 1);
+                        if (!hides_face(x, y - 1, z)) add_face(out, x, y, z, 3, TILE_BOT[b], -y);
+                        if (!hides_face(x, y, z + 1)) add_face(out, x, y, z, 4, side, z + 1);
+                        if (!hides_face(x, y, z - 1)) add_face(out, x, y, z, 5, side, -z);
+                    }
+                }
             }
-            n = n + VERT_STRIDE;
+        }
+        chunk_faces[ci] = out;
+    }
+
+    fn build_all_chunks() {
+        for (let i = 0; i < CHUNKS_X * CHUNKS_Z; i = i + 1) {
+            push(chunk_faces, nil);
+            build_chunk(i);
         }
     }
-    let corners = n / VERT_STRIDE;
-    if (corners < 3 || quad_count + 2 > MAX_QUADS) ret;
 
-    let q = quad_count;
-    write_poly_vertex(q, 0, 0, color);
-    write_poly_vertex(q, 1, 1, color);
-    write_poly_vertex(q, 2, 2, color);
-    if (corners >= 4) write_poly_vertex(q, 3, 3, color); else write_poly_vertex(q, 3, 2, color);
-    quad_keys[q] = key;
-    q = q + 1;
-    if (corners == 5) {
+    // ---------- camera ----------
+
+    let EYE_HEIGHT = 1.62;
+    let eye_x = 0;
+    let eye_y = 0;
+    let eye_z = 0;
+    let yaw = 2.35;
+    let pitch = -0.2;
+
+    let FOCAL = (WIN_H / 2) / tan(FOV_DEGREES * 3.14159265 / 360);
+    let CX = WIN_W / 2;
+    let CY = WIN_H / 2;
+    let CULL_SLOPE = (WIN_W / 2) / FOCAL * 1.05;
+    let CULL_SLOPE_Y = (WIN_H / 2) / FOCAL * 1.05;
+
+    // Camera basis, in world coordinates: right, up, forward.
+    let rgt_x = 1; let rgt_y = 0; let rgt_z = 0;
+    let up_x = 0;  let up_y = 1;  let up_z = 0;
+    let fwd_x = 0; let fwd_y = 0; let fwd_z = -1;
+
+    // Each direction's first corner relative to its block, then the edges along the
+    // tile's u and v axes.
+    let FACE_DEFS = [
+        1,1,1,  0,0,-1,  0,-1,0,
+        0,1,0,  0,0,1,   0,-1,0,
+        0,1,0,  1,0,0,   0,0,1,
+        0,0,1,  1,0,0,   0,0,-1,
+        0,1,1,  1,0,0,   0,-1,0,
+        1,1,0,  -1,0,0,  0,-1,0,
+    ];
+    // FACE_DEFS rotated into view space, refreshed each frame.
+    let view_defs = [];
+    let CAM_PLANE = [0, 0, 0, 0, 0, 0];
+
+    fn update_camera() {
+        let sy = sin(yaw);
+        let cy = cos(yaw);
+        let sp = sin(pitch);
+        let cp = cos(pitch);
+        rgt_x = cy;      rgt_y = 0;   rgt_z = sy;
+        up_x = -sy * sp; up_y = cp;   up_z = cy * sp;
+        fwd_x = sy * cp; fwd_y = sp;  fwd_z = -cy * cp;
+
+        for (let i = 0; i < 54; i = i + 3) {
+            let x = FACE_DEFS[i];
+            let y = FACE_DEFS[i + 1];
+            let z = FACE_DEFS[i + 2];
+            view_defs[i]     = x * rgt_x + y * rgt_y + z * rgt_z;
+            view_defs[i + 1] = x * up_x + y * up_y + z * up_z;
+            view_defs[i + 2] = x * fwd_x + y * fwd_y + z * fwd_z;
+        }
+        CAM_PLANE[0] = eye_x;  CAM_PLANE[1] = -eye_x;
+        CAM_PLANE[2] = eye_y;  CAM_PLANE[3] = -eye_y;
+        CAM_PLANE[4] = eye_z;  CAM_PLANE[5] = -eye_z;
+    }
+
+    // ---------- player ----------
+
+    let PLAYER_HALF_WIDTH = 0.3;
+    let PLAYER_HEIGHT = 1.8;
+    let COLLISION_GAP = 0.001;
+    let WALK_SPEED = 4.6;
+    let JUMP_SPEED = 7.8;
+    let GRAVITY = 24;
+    let MAX_FALL = 30;
+    let MOUSE_SENSITIVITY = 0.0025;
+    let MAX_PITCH = 1.55;
+
+    let px = 0;
+    let py = 0;
+    let pz = 0;
+    let vel_y = 0;
+    let on_ground = false;
+
+    // Unlike hides_face, this treats the world's sides as walls so the player stays inside.
+    fn blocked(x, y, z) {
+        if (y < 0) ret true;
+        if (y >= SY) ret false;
+        if (x < 0 || x >= SX || z < 0 || z >= SZ) ret true;
+        ret world[x + z * SX + y * SXZ] != AIR;
+    }
+
+    fn box_hits_world(x, y, z) {
+        let hw = PLAYER_HALF_WIDTH;
+        let x1 = floor(x + hw);
+        let y1 = floor(y + PLAYER_HEIGHT);
+        let z1 = floor(z + hw);
+        for (let by = floor(y); by <= y1; by = by + 1) {
+            for (let bz = floor(z - hw); bz <= z1; bz = bz + 1) {
+                for (let bx = floor(x - hw); bx <= x1; bx = bx + 1) {
+                    if (blocked(bx, by, bz)) ret true;
+                }
+            }
+        }
+        ret false;
+    }
+
+    fn move_axis_x(dx) {
+        if (dx == 0) ret;
+        let nx = px + dx;
+        if (box_hits_world(nx, py, pz)) {
+            if (dx > 0) nx = floor(nx + PLAYER_HALF_WIDTH) - PLAYER_HALF_WIDTH - COLLISION_GAP;
+            else nx = floor(nx - PLAYER_HALF_WIDTH) + 1 + PLAYER_HALF_WIDTH + COLLISION_GAP;
+            if (box_hits_world(nx, py, pz)) nx = px;
+        }
+        px = nx;
+    }
+
+    fn move_axis_z(dz) {
+        if (dz == 0) ret;
+        let nz = pz + dz;
+        if (box_hits_world(px, py, nz)) {
+            if (dz > 0) nz = floor(nz + PLAYER_HALF_WIDTH) - PLAYER_HALF_WIDTH - COLLISION_GAP;
+            else nz = floor(nz - PLAYER_HALF_WIDTH) + 1 + PLAYER_HALF_WIDTH + COLLISION_GAP;
+            if (box_hits_world(px, py, nz)) nz = pz;
+        }
+        pz = nz;
+    }
+
+    fn move_axis_y(dy) {
+        on_ground = false;
+        let ny = py + dy;
+        if (box_hits_world(px, ny, pz)) {
+            if (dy < 0) {
+                ny = floor(ny) + 1 + COLLISION_GAP;
+                on_ground = true;
+            } else {
+                ny = floor(ny + PLAYER_HEIGHT) - PLAYER_HEIGHT - COLLISION_GAP;
+            }
+            vel_y = 0;
+            if (box_hits_world(px, ny, pz)) ny = py;
+        }
+        py = ny;
+    }
+
+    // forward and strafe are -1, 0 or 1. Each axis resolves on its own, which lets the
+    // player slide along walls.
+    fn step_player(dt, forward, strafe, jump) {
+        let sy = sin(yaw);
+        let cy = cos(yaw);
+        let wx = sy * forward + cy * strafe;
+        let wz = -cy * forward + sy * strafe;
+        let wish = sqrt(wx * wx + wz * wz);
+        if (wish > 0) {
+            wx = wx / wish * WALK_SPEED;
+            wz = wz / wish * WALK_SPEED;
+        }
+        if (jump && on_ground) vel_y = JUMP_SPEED;
+        vel_y = max(vel_y - GRAVITY * dt, -MAX_FALL);
+        move_axis_x(wx * dt);
+        move_axis_z(wz * dt);
+        move_axis_y(vel_y * dt);
+    }
+
+    fn look(dx, dy) {
+        yaw = yaw + dx * MOUSE_SENSITIVITY;
+        pitch = min(MAX_PITCH, max(-MAX_PITCH, pitch - dy * MOUSE_SENSITIVITY));
+    }
+
+    fn sync_eye() {
+        eye_x = px;
+        eye_y = py + EYE_HEIGHT;
+        eye_z = pz;
+    }
+
+    // Starts on the open ground nearest the middle of the world, not on a treetop.
+    fn spawn_player() {
+        let mid_x = SX / 2;
+        let mid_z = SZ / 2;
+        for (let r = 0; r < SX / 2; r = r + 1) {
+            for (let dz = -r; dz <= r; dz = dz + 1) {
+                for (let dx = -r; dx <= r; dx = dx + 1) {
+                    let h = terrain_height(mid_x + dx, mid_z + dz);
+                    if (get_block(mid_x + dx, h, mid_z + dz) == GRASS &&
+                        get_block(mid_x + dx, h + 1, mid_z + dz) == AIR) {
+                        px = mid_x + dx + 0.5;
+                        py = h + 1 + COLLISION_GAP;
+                        pz = mid_z + dz + 0.5;
+                        ret;
+                    }
+                }
+            }
+        }
+        px = mid_x + 0.5;
+        py = SY;
+        pz = mid_z + 0.5;
+    }
+
+    // ---------- interaction ----------
+
+    let REACH = 6;
+    let ACTION_REPEAT = 0.25;
+    let selected_block = GRASS;
+    let SLOT_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8"];   // block type = slot + 1
+
+    // Results of the latest raycast. prev_* is the air cell in front of the hit block, and
+    // hit_dir the direction of the face that was hit.
+    let ray_hit = false;
+    let hit_x = 0; let hit_y = 0; let hit_z = 0;
+    let prev_x = 0; let prev_y = 0; let prev_z = 0;
+    let hit_dir = 0;
+
+    fn axis_step(d) {
+        if (d > 0) ret 1;
+        if (d < 0) ret -1;
+        ret 0;
+    }
+
+    // Distance along the ray to the first grid plane on an axis.
+    fn first_crossing(origin, d) {
+        if (d > 0) ret (floor(origin) + 1 - origin) / d;
+        if (d < 0) ret (origin - floor(origin)) / -d;
+        ret 1000000;
+    }
+
+    fn crossing_spacing(d) {
+        if (d == 0) ret 1000000;
+        ret 1 / abs(d);
+    }
+
+    // Amanatides & Woo grid traversal along the view direction.
+    fn raycast() {
+        ray_hit = false;
+        let x = floor(eye_x); let y = floor(eye_y); let z = floor(eye_z);
+        let step_x = axis_step(fwd_x); let step_y = axis_step(fwd_y); let step_z = axis_step(fwd_z);
+        let tx = first_crossing(eye_x, fwd_x);
+        let ty = first_crossing(eye_y, fwd_y);
+        let tz = first_crossing(eye_z, fwd_z);
+        let dx = crossing_spacing(fwd_x);
+        let dy = crossing_spacing(fwd_y);
+        let dz = crossing_spacing(fwd_z);
+        let t = 0;
+        while (t <= REACH) {
+            if (get_block(x, y, z) != AIR) {
+                ray_hit = true;
+                hit_x = x; hit_y = y; hit_z = z;
+                ret;
+            }
+            prev_x = x; prev_y = y; prev_z = z;
+            if (tx <= ty && tx <= tz) {
+                x = x + step_x; t = tx; tx = tx + dx;
+                if (step_x > 0) hit_dir = 1; else hit_dir = 0;
+            } else if (ty <= tz) {
+                y = y + step_y; t = ty; ty = ty + dy;
+                if (step_y > 0) hit_dir = 3; else hit_dir = 2;
+            } else {
+                z = z + step_z; t = tz; tz = tz + dz;
+                if (step_z > 0) hit_dir = 5; else hit_dir = 4;
+            }
+        }
+    }
+
+    fn rebuild_chunk_at(x, z) {
+        if (x >= 0 && x < SX && z >= 0 && z < SZ) {
+            build_chunk(floor(x / CHUNK) + floor(z / CHUNK) * CHUNKS_X);
+        }
+    }
+
+    // A block on a chunk border also changes the neighboring chunk's faces.
+    fn block_changed(x, z) {
+        rebuild_chunk_at(x, z);
+        if ((x % CHUNK) == 0) rebuild_chunk_at(x - 1, z);
+        if ((x % CHUNK) == CHUNK - 1) rebuild_chunk_at(x + 1, z);
+        if ((z % CHUNK) == 0) rebuild_chunk_at(x, z - 1);
+        if ((z % CHUNK) == CHUNK - 1) rebuild_chunk_at(x, z + 1);
+    }
+
+    // The bottom layer stays, since the world has no undersides to show through a hole.
+    fn break_block() {
+        if (!ray_hit || hit_y == 0) ret false;
+        set_block(hit_x, hit_y, hit_z, AIR);
+        block_changed(hit_x, hit_z);
+        ret true;
+    }
+
+    fn box_overlaps_cell(x, y, z) {
+        let hw = PLAYER_HALF_WIDTH;
+        ret px + hw > x && px - hw < x + 1 &&
+            py + PLAYER_HEIGHT > y && py < y + 1 &&
+            pz + hw > z && pz - hw < z + 1;
+    }
+
+    fn place_block() {
+        if (!ray_hit) ret false;
+        if (!in_world(prev_x, prev_y, prev_z)) ret false;
+        if (get_block(prev_x, prev_y, prev_z) != AIR) ret false;
+        if (box_overlaps_cell(prev_x, prev_y, prev_z)) ret false;
+        set_block(prev_x, prev_y, prev_z, selected_block);
+        block_changed(prev_x, prev_z);
+        ret true;
+    }
+
+    // ---------- rendering ----------
+
+    let ATLAS_GRID = 4;
+    let TILE_SIZE = 1 / ATLAS_GRID;
+    let UV_INSET = 0.002;        // keeps sampling from bleeding into the next tile
+    let TILE_DU = TILE_SIZE - 2 * UV_INSET;
+    let TILE_U = [];
+    let TILE_V = [];
+
+    let VERT_STRIDE = 5;
+    let QUAD_STRIDE = 20;
+    let verts = [];
+    let indices = [];
+    let quad_keys = [];
+    let quad_count = 0;
+    let NUM_BUCKETS = 128;
+    let bucket_counts = [];
+
+    // Packed vertex colors for each direction's shade, at each fog level.
+    let FOG_LEVELS = 16;
+    let FOG_START = RENDER_RADIUS * 0.75;
+    let FOG_SCALE = FOG_LEVELS / (RENDER_RADIUS * RENDER_RADIUS - FOG_START * FOG_START);
+    let DIR_SHADE = [0.72, 0.72, 1.0, 0.5, 0.85, 0.85];
+    let colors = [];
+    let COLOR_WHITE = 4294967295;
+
+    fn pack_rgba(r, g, b, a) { ret floor(r) * 16777216 + floor(g) * 65536 + floor(b) * 256 + floor(a); }
+
+    fn init_render_buffers() {
+        for (let i = 0; i < ATLAS_GRID * ATLAS_GRID; i = i + 1) {
+            push(TILE_U, (i % ATLAS_GRID) * TILE_SIZE + UV_INSET);
+            push(TILE_V, floor(i / ATLAS_GRID) * TILE_SIZE + UV_INSET);
+        }
+        for (let i = 0; i < MAX_QUADS * QUAD_STRIDE; i = i + 1) push(verts, 0);
+        for (let i = 0; i < MAX_QUADS * 6; i = i + 1) push(indices, 0);
+        for (let i = 0; i < MAX_QUADS; i = i + 1) push(quad_keys, 0);
+        for (let i = 0; i < NUM_BUCKETS; i = i + 1) push(bucket_counts, 0);
+        for (let i = 0; i < 54; i = i + 1) push(view_defs, 0);
+        for (let i = 0; i < 6 * FOG_LEVELS; i = i + 1) push(colors, 0);
+    }
+
+    fn update_colors(light) {
+        let k = 0;
+        for (let d = 0; d < 6; d = d + 1) {
+            let c = 255 * DIR_SHADE[d] * light;
+            for (let f = 0; f < FOG_LEVELS; f = f + 1) {
+                colors[k] = pack_rgba(c, c, c, 255 * (1 - f / (FOG_LEVELS - 1)));
+                k = k + 1;
+            }
+        }
+    }
+
+    // Sutherland-Hodgman buffers: view x, y, z, u, v per polygon corner.
+    let poly_in = [];
+    let poly_out = [];
+    fn init_clip_buffers() {
+        for (let i = 0; i < 40; i = i + 1) { push(poly_in, 0); push(poly_out, 0); }
+    }
+
+    fn write_vertex(k, vx, vy, vz, u, v, color) {
+        let iz = FOCAL / vz;
+        verts[k] = CX + vx * iz;
+        verts[k + 1] = CY - vy * iz;
+        verts[k + 2] = u;
+        verts[k + 3] = v;
+        verts[k + 4] = color;
+    }
+
+    // Writes polygon corner `c` as vertex slot `slot` of quad `q`.
+    fn write_poly_vertex(q, slot, c, color) {
+        let p = c * VERT_STRIDE;
+        write_vertex(q * QUAD_STRIDE + slot * VERT_STRIDE,
+                     poly_out[p], poly_out[p + 1], poly_out[p + 2], poly_out[p + 3], poly_out[p + 4], color);
+    }
+
+    // Clips a quad of poly_in against the near plane, emitting 0, 1 or 2 quads. A
+    // clipped quad has 3 to 5 corners; a triangle repeats its last corner to stay a quad.
+    fn emit_clipped_quad(key, color) {
+        let n = 0;
+        for (let i = 0; i < 4; i = i + 1) {
+            let a = i * VERT_STRIDE;
+            let b = ((i + 1) % 4) * VERT_STRIDE;
+            let za = poly_in[a + 2];
+            let zb = poly_in[b + 2];
+            if (za >= NEAR) {
+                for (let j = 0; j < VERT_STRIDE; j = j + 1) poly_out[n + j] = poly_in[a + j];
+                n = n + VERT_STRIDE;
+            }
+            if ((za >= NEAR) != (zb >= NEAR)) {
+                let t = (NEAR - za) / (zb - za);
+                for (let j = 0; j < VERT_STRIDE; j = j + 1) {
+                    poly_out[n + j] = poly_in[a + j] + (poly_in[b + j] - poly_in[a + j]) * t;
+                }
+                n = n + VERT_STRIDE;
+            }
+        }
+        let corners = n / VERT_STRIDE;
+        if (corners < 3 || quad_count + 2 > MAX_QUADS) ret;
+
+        let q = quad_count;
         write_poly_vertex(q, 0, 0, color);
-        write_poly_vertex(q, 1, 3, color);
-        write_poly_vertex(q, 2, 4, color);
-        write_poly_vertex(q, 3, 4, color);
+        write_poly_vertex(q, 1, 1, color);
+        write_poly_vertex(q, 2, 2, color);
+        if (corners >= 4) write_poly_vertex(q, 3, 3, color); else write_poly_vertex(q, 3, 2, color);
         quad_keys[q] = key;
         q = q + 1;
+        if (corners == 5) {
+            write_poly_vertex(q, 0, 0, color);
+            write_poly_vertex(q, 1, 3, color);
+            write_poly_vertex(q, 2, 4, color);
+            write_poly_vertex(q, 3, 4, color);
+            quad_keys[q] = key;
+            q = q + 1;
+        }
+        quad_count = q;
     }
-    quad_count = q;
-}
 
-fn set_poly_corner(c, vx, vy, vz, u, v) {
-    let p = c * VERT_STRIDE;
-    poly_in[p] = vx;
-    poly_in[p + 1] = vy;
-    poly_in[p + 2] = vz;
-    poly_in[p + 3] = u;
-    poly_in[p + 4] = v;
-}
+    fn set_poly_corner(c, vx, vy, vz, u, v) {
+        let p = c * VERT_STRIDE;
+        poly_in[p] = vx;
+        poly_in[p + 1] = vy;
+        poly_in[p + 2] = vz;
+        poly_in[p + 3] = u;
+        poly_in[p + 4] = v;
+    }
 
-// Draws one face in N x N pieces, each clipped on its own. Used for faces near the
-// camera, where a single quad would visibly warp or cross the near plane.
-fn emit_near_face(vx, vy, vz, d, u0, v0, key, color, n) {
-    let o = d * 9;
-    let step = 1 / n;
-    let ax = view_defs[o + 3] * step;
-    let ay = view_defs[o + 4] * step;
-    let az = view_defs[o + 5] * step;
-    let bx = view_defs[o + 6] * step;
-    let by = view_defs[o + 7] * step;
-    let bz = view_defs[o + 8] * step;
-    let du = TILE_DU * step;
-    for (let j = 0; j < n; j = j + 1) {
-        for (let i = 0; i < n; i = i + 1) {
-            let x = vx + ax * i + bx * j;
-            let y = vy + ay * i + by * j;
-            let z = vz + az * i + bz * j;
-            let u = u0 + du * i;
-            let v = v0 + du * j;
-            set_poly_corner(0, x, y, z, u, v);
-            set_poly_corner(1, x + ax, y + ay, z + az, u + du, v);
-            set_poly_corner(2, x + ax + bx, y + ay + by, z + az + bz, u + du, v + du);
-            set_poly_corner(3, x + bx, y + by, z + bz, u, v + du);
-            emit_clipped_quad(key, color);
+    // Draws one face in N x N pieces, each clipped on its own. Used for faces near the
+    // camera, where a single quad would visibly warp or cross the near plane.
+    fn emit_near_face(vx, vy, vz, d, u0, v0, key, color, n) {
+        let o = d * 9;
+        let step = 1 / n;
+        let ax = view_defs[o + 3] * step;
+        let ay = view_defs[o + 4] * step;
+        let az = view_defs[o + 5] * step;
+        let bx = view_defs[o + 6] * step;
+        let by = view_defs[o + 7] * step;
+        let bz = view_defs[o + 8] * step;
+        let du = TILE_DU * step;
+        for (let j = 0; j < n; j = j + 1) {
+            for (let i = 0; i < n; i = i + 1) {
+                let x = vx + ax * i + bx * j;
+                let y = vy + ay * i + by * j;
+                let z = vz + az * i + bz * j;
+                let u = u0 + du * i;
+                let v = v0 + du * j;
+                set_poly_corner(0, x, y, z, u, v);
+                set_poly_corner(1, x + ax, y + ay, z + az, u + du, v);
+                set_poly_corner(2, x + ax + bx, y + ay + by, z + az + bz, u + du, v + du);
+                set_poly_corner(3, x + bx, y + by, z + bz, u, v + du);
+                emit_clipped_quad(key, color);
+            }
         }
     }
-}
 
-// Rough test of a sphere of radius r around a view-space point against the frustum.
-fn sphere_visible(vx, vy, vz, r) {
-    if (vz < -r) ret false;
-    let lim = (vz + r) * CULL_SLOPE + r;
-    if (vx > lim || vx < -lim) ret false;
-    lim = (vz + r) * CULL_SLOPE_Y + r;
-    ret vy <= lim && vy >= -lim;
-}
+    // Rough test of a sphere of radius r around a view-space point against the frustum.
+    fn sphere_visible(vx, vy, vz, r) {
+        if (vz < -r) ret false;
+        let lim = (vz + r) * CULL_SLOPE + r;
+        if (vx > lim || vx < -lim) ret false;
+        lim = (vz + r) * CULL_SLOPE_Y + r;
+        ret vy <= lim && vy >= -lim;
+    }
 
-// Projects the front-facing, in-range faces of one chunk into the vertex buffer.
-fn project_chunk(faces) {
-    let ex = eye_x; let ey = eye_y; let ez = eye_z;
-    let rx = rgt_x; let ry = rgt_y; let rz = rgt_z;
-    let ux = up_x;  let uy = up_y;  let uz = up_z;
-    let fx = fwd_x; let fy = fwd_y; let fz = fwd_z;
-    let cell_x = floor(ex); let cell_y = floor(ey); let cell_z = floor(ez);
-    let radius2 = RENDER_RADIUS * RENDER_RADIUS;
-    let fog_start2 = FOG_START * FOG_START;
-    let fog_scale = FOG_SCALE;
-    let fog_levels = FOG_LEVELS;
-    let slope_x = CULL_SLOPE;
-    let slope_y = CULL_SLOPE_Y;
-    let focal = FOCAL;
-    let cx = CX; let cy = CY;
-    let near_dist = SUBDIVIDE_DIST;
-    let near = NEAR;
-    let max_quads = MAX_QUADS;
-    let last_bucket = NUM_BUCKETS - 1;
-    let du = TILE_DU;
-    let vd = view_defs;
-    let planes = CAM_PLANE;
-    let out = verts;
-    let keys = quad_keys;
-    let tile_u = TILE_U;
-    let tile_v = TILE_V;
-    let palette = colors;
-    let stride = FACE_STRIDE;
-    let n = len(faces);
-    let q = quad_count;
+    // Projects the front-facing, in-range faces of one chunk into the vertex buffer.
+    fn project_chunk(faces) {
+        let ex = eye_x; let ey = eye_y; let ez = eye_z;
+        let rx = rgt_x; let ry = rgt_y; let rz = rgt_z;
+        let ux = up_x;  let uy = up_y;  let uz = up_z;
+        let fx = fwd_x; let fy = fwd_y; let fz = fwd_z;
+        let cell_x = floor(ex); let cell_y = floor(ey); let cell_z = floor(ez);
+        let radius2 = RENDER_RADIUS * RENDER_RADIUS;
+        let fog_start2 = FOG_START * FOG_START;
+        let fog_scale = FOG_SCALE;
+        let fog_levels = FOG_LEVELS;
+        let slope_x = CULL_SLOPE;
+        let slope_y = CULL_SLOPE_Y;
+        let focal = FOCAL;
+        let cx = CX; let cy = CY;
+        let near_dist = SUBDIVIDE_DIST;
+        let near = NEAR;
+        let max_quads = MAX_QUADS;
+        let last_bucket = NUM_BUCKETS - 1;
+        let du = TILE_DU;
+        let vd = view_defs;
+        let planes = CAM_PLANE;
+        let out = verts;
+        let keys = quad_keys;
+        let tile_u = TILE_U;
+        let tile_v = TILE_V;
+        let palette = colors;
+        let stride = FACE_STRIDE;
+        let n = len(faces);
+        let q = quad_count;
 
-    for (let i = 0; i < n; i = i + stride) {
-        let d = faces[i + 3];
-        if (planes[d] > faces[i + 5]) {
-            let x = faces[i];
-            let y = faces[i + 1];
-            let z = faces[i + 2];
-            let dx = x - ex;
-            let dy = y - ey;
-            let dz = z - ez;
-            let dist2 = dx * dx + dz * dz;
-            if (dist2 < radius2) {
-                let vz = dx * fx + dy * fy + dz * fz;
-                let vx = dx * rx + dz * rz;
-                let vy = dx * ux + dy * uy + dz * uz;
-                let lim_x = (vz + 2) * slope_x + 2;
-                let lim_y = (vz + 2) * slope_y + 2;
-                if (vz > -2 && vx < lim_x && vx > -lim_x && vy < lim_y && vy > -lim_y) {
-                    // Any ray from the eye enters grid cells in strictly increasing
-                    // Manhattan offset from the eye's cell, so this key alone gives an
-                    // exact back-to-front order.
-                    let kx = x - cell_x; if (kx < 0) kx = -kx;
-                    let ky = y - cell_y; if (ky < 0) ky = -ky;
-                    let kz = z - cell_z; if (kz < 0) kz = -kz;
-                    let key = kx + ky + kz;
-                    if (key > last_bucket) key = last_bucket;
+        for (let i = 0; i < n; i = i + stride) {
+            let d = faces[i + 3];
+            if (planes[d] > faces[i + 5]) {
+                let x = faces[i];
+                let y = faces[i + 1];
+                let z = faces[i + 2];
+                let dx = x - ex;
+                let dy = y - ey;
+                let dz = z - ez;
+                let dist2 = dx * dx + dz * dz;
+                if (dist2 < radius2) {
+                    let vz = dx * fx + dy * fy + dz * fz;
+                    let vx = dx * rx + dz * rz;
+                    let vy = dx * ux + dy * uy + dz * uz;
+                    let lim_x = (vz + 2) * slope_x + 2;
+                    let lim_y = (vz + 2) * slope_y + 2;
+                    if (vz > -2 && vx < lim_x && vx > -lim_x && vy < lim_y && vy > -lim_y) {
+                        // Any ray from the eye enters grid cells in strictly increasing
+                        // Manhattan offset from the eye's cell, so this key alone gives an
+                        // exact back-to-front order.
+                        let kx = x - cell_x; if (kx < 0) kx = -kx;
+                        let ky = y - cell_y; if (ky < 0) ky = -ky;
+                        let kz = z - cell_z; if (kz < 0) kz = -kz;
+                        let key = kx + ky + kz;
+                        if (key > last_bucket) key = last_bucket;
 
-                    let fog = 0;
-                    if (dist2 > fog_start2) {
-                        fog = floor((dist2 - fog_start2) * fog_scale);
-                        if (fog >= fog_levels) fog = fog_levels - 1;
-                    }
-                    let color = palette[d * fog_levels + fog];
+                        let fog = 0;
+                        if (dist2 > fog_start2) {
+                            fog = floor((dist2 - fog_start2) * fog_scale);
+                            if (fog >= fog_levels) fog = fog_levels - 1;
+                        }
+                        let color = palette[d * fog_levels + fog];
 
-                    let o = d * 9;
-                    let x0 = vx + vd[o];
-                    let y0 = vy + vd[o + 1];
-                    let z0 = vz + vd[o + 2];
-                    let ax = vd[o + 3]; let ay = vd[o + 4]; let az = vd[o + 5];
-                    let bx = vd[o + 6]; let by = vd[o + 7]; let bz = vd[o + 8];
-                    let z1 = z0 + az;
-                    let z2 = z1 + bz;
-                    let z3 = z0 + bz;
-                    let t = faces[i + 4];
-                    let u0 = tile_u[t];
-                    let v0 = tile_v[t];
+                        let o = d * 9;
+                        let x0 = vx + vd[o];
+                        let y0 = vy + vd[o + 1];
+                        let z0 = vz + vd[o + 2];
+                        let ax = vd[o + 3]; let ay = vd[o + 4]; let az = vd[o + 5];
+                        let bx = vd[o + 6]; let by = vd[o + 7]; let bz = vd[o + 8];
+                        let z1 = z0 + az;
+                        let z2 = z1 + bz;
+                        let z3 = z0 + bz;
+                        let t = faces[i + 4];
+                        let u0 = tile_u[t];
+                        let v0 = tile_v[t];
 
-                    if (z0 < near_dist || z1 < near_dist || z2 < near_dist || z3 < near_dist) {
-                        quad_count = q;
-                        emit_near_face(x0, y0, z0, d, u0, v0, key, color, SUBDIVISIONS);
-                        q = quad_count;
-                    } else if (q < max_quads) {
-                        let k = q * 20;
-                        let iz = focal / z0;
-                        out[k] = cx + x0 * iz;
-                        out[k + 1] = cy - y0 * iz;
-                        out[k + 2] = u0;
-                        out[k + 3] = v0;
-                        out[k + 4] = color;
-                        let x1 = x0 + ax; let y1 = y0 + ay;
-                        iz = focal / z1;
-                        out[k + 5] = cx + x1 * iz;
-                        out[k + 6] = cy - y1 * iz;
-                        out[k + 7] = u0 + du;
-                        out[k + 8] = v0;
-                        out[k + 9] = color;
-                        let x2 = x1 + bx; let y2 = y1 + by;
-                        iz = focal / z2;
-                        out[k + 10] = cx + x2 * iz;
-                        out[k + 11] = cy - y2 * iz;
-                        out[k + 12] = u0 + du;
-                        out[k + 13] = v0 + du;
-                        out[k + 14] = color;
-                        iz = focal / z3;
-                        out[k + 15] = cx + (x0 + bx) * iz;
-                        out[k + 16] = cy - (y0 + by) * iz;
-                        out[k + 17] = u0;
-                        out[k + 18] = v0 + du;
-                        out[k + 19] = color;
-                        keys[q] = key;
-                        q = q + 1;
+                        if (z0 < near_dist || z1 < near_dist || z2 < near_dist || z3 < near_dist) {
+                            quad_count = q;
+                            emit_near_face(x0, y0, z0, d, u0, v0, key, color, SUBDIVISIONS);
+                            q = quad_count;
+                        } else if (q < max_quads) {
+                            let k = q * 20;
+                            let iz = focal / z0;
+                            out[k] = cx + x0 * iz;
+                            out[k + 1] = cy - y0 * iz;
+                            out[k + 2] = u0;
+                            out[k + 3] = v0;
+                            out[k + 4] = color;
+                            let x1 = x0 + ax; let y1 = y0 + ay;
+                            iz = focal / z1;
+                            out[k + 5] = cx + x1 * iz;
+                            out[k + 6] = cy - y1 * iz;
+                            out[k + 7] = u0 + du;
+                            out[k + 8] = v0;
+                            out[k + 9] = color;
+                            let x2 = x1 + bx; let y2 = y1 + by;
+                            iz = focal / z2;
+                            out[k + 10] = cx + x2 * iz;
+                            out[k + 11] = cy - y2 * iz;
+                            out[k + 12] = u0 + du;
+                            out[k + 13] = v0 + du;
+                            out[k + 14] = color;
+                            iz = focal / z3;
+                            out[k + 15] = cx + (x0 + bx) * iz;
+                            out[k + 16] = cy - (y0 + by) * iz;
+                            out[k + 17] = u0;
+                            out[k + 18] = v0 + du;
+                            out[k + 19] = color;
+                            keys[q] = key;
+                            q = q + 1;
+                        }
                     }
                 }
             }
         }
+        quad_count = q;
     }
-    quad_count = q;
-}
 
-fn project_world() {
-    quad_count = 0;
-    let half = CHUNK / 2;
-    let chunk_radius = 12;  // half-diagonal of an 8 x 16 x 8 chunk
-    let reach = RENDER_RADIUS + chunk_radius;
-    for (let i = 0; i < CHUNKS_X * CHUNKS_Z; i = i + 1) {
-        let dx = (i % CHUNKS_X) * CHUNK + half - eye_x;
-        let dy = SY / 2 - eye_y;
-        let dz = floor(i / CHUNKS_X) * CHUNK + half - eye_z;
-        if (dx * dx + dz * dz < reach * reach) {
-            let vx = dx * rgt_x + dy * rgt_y + dz * rgt_z;
-            let vy = dx * up_x + dy * up_y + dz * up_z;
-            let vz = dx * fwd_x + dy * fwd_y + dz * fwd_z;
-            if (sphere_visible(vx, vy, vz, chunk_radius)) project_chunk(chunk_faces[i]);
+    fn project_world() {
+        quad_count = 0;
+        let half = CHUNK / 2;
+        let chunk_radius = 12;  // half-diagonal of an 8 x 16 x 8 chunk
+        let reach = RENDER_RADIUS + chunk_radius;
+        for (let i = 0; i < CHUNKS_X * CHUNKS_Z; i = i + 1) {
+            let dx = (i % CHUNKS_X) * CHUNK + half - eye_x;
+            let dy = SY / 2 - eye_y;
+            let dz = floor(i / CHUNKS_X) * CHUNK + half - eye_z;
+            if (dx * dx + dz * dz < reach * reach) {
+                let vx = dx * rgt_x + dy * rgt_y + dz * rgt_z;
+                let vy = dx * up_x + dy * up_y + dz * up_z;
+                let vz = dx * fwd_x + dy * fwd_y + dz * fwd_z;
+                if (sphere_visible(vx, vy, vz, chunk_radius)) project_chunk(chunk_faces[i]);
+            }
         }
     }
-}
 
-// Counting sort of the quads, farthest bucket first, written out as indices.
-fn sort_quads() {
-    let n = quad_count;
-    let keys = quad_keys;
-    let counts = bucket_counts;
-    let out = indices;
-    let buckets = NUM_BUCKETS;
-    for (let b = 0; b < buckets; b = b + 1) counts[b] = 0;
-    for (let q = 0; q < n; q = q + 1) {
-        let k = keys[q];
-        counts[k] = counts[k] + 1;
-    }
-    let start = 0;
-    for (let b = buckets - 1; b >= 0; b = b - 1) {
-        let c = counts[b];
-        counts[b] = start;
-        start = start + c * 6;
-    }
-    for (let q = 0; q < n; q = q + 1) {
-        let k = keys[q];
-        let at = counts[k];
-        counts[k] = at + 6;
-        let v = q * 4;
-        out[at] = v;
-        out[at + 1] = v + 1;
-        out[at + 2] = v + 2;
-        out[at + 3] = v;
-        out[at + 4] = v + 2;
-        out[at + 5] = v + 3;
-    }
-}
-
-// ---------- main ----------
-
-let atlas = -1;
-
-fn load_atlas() {
-    atlas = sdl_load_texture("examples/minecraft/atlas.png");
-    if (atlas < 0) atlas = sdl_load_texture("atlas.png");
-    ret atlas >= 0;
-}
-
-fn draw_frame() {
-    sdl_clear(135, 190, 235);
-    sdl_draw_tris(atlas, verts, quad_count * 4, indices, quad_count * 6);
-    sdl_present();
-}
-
-fn main() {
-    sdl_init("LunarCraft", WIN_W, WIN_H);
-    if (!load_atlas()) { print "Could not load atlas.png"; sdl_quit(); ret; }
-    let t0 = sdl_time();
-    generate_world();
-    build_all_chunks();
-    init_render_buffers();
-    init_clip_buffers();
-    update_colors(1);
-    print "world ready in " + str(floor((sdl_time() - t0) * 1000)) + " ms";
-    spawn_player();
-    if (DEMO_SECONDS > 0) sdl_set_vsync(false);
-    else sdl_set_relative_mouse(true);
-
-    let start = sdl_time();
-    let last = start;
-    let frames = 0;
-    let running = true;
-    while (running) {
-        if (sdl_poll() == "quit" || sdl_key_down("escape")) running = false;
-        let frame_start = sdl_time();
-        let dt = min(0.05, frame_start - last);
-        last = frame_start;
-
-        if (DEMO_SECONDS > 0) {
-            let now = frame_start - start;
-            yaw = 2.35 + now * 0.25;
-            step_player(dt, 1, 0, true);
-            if (now > DEMO_SECONDS) running = false;
-        } else {
-            look(sdl_mouse_dx(), sdl_mouse_dy());
-            let forward = 0;
-            let strafe = 0;
-            if (sdl_key_down("w")) forward = forward + 1;
-            if (sdl_key_down("s")) forward = forward - 1;
-            if (sdl_key_down("d")) strafe = strafe + 1;
-            if (sdl_key_down("a")) strafe = strafe - 1;
-            step_player(dt, forward, strafe, sdl_key_down("space"));
+    // Counting sort of the quads, farthest bucket first, written out as indices.
+    fn sort_quads() {
+        let n = quad_count;
+        let keys = quad_keys;
+        let counts = bucket_counts;
+        let out = indices;
+        let buckets = NUM_BUCKETS;
+        for (let b = 0; b < buckets; b = b + 1) counts[b] = 0;
+        for (let q = 0; q < n; q = q + 1) {
+            let k = keys[q];
+            counts[k] = counts[k] + 1;
         }
-        sync_eye();
-        update_camera();
-        project_world();
-        sort_quads();
-        draw_frame();
-        frames = frames + 1;
+        let start = 0;
+        for (let b = buckets - 1; b >= 0; b = b - 1) {
+            let c = counts[b];
+            counts[b] = start;
+            start = start + c * 6;
+        }
+        for (let q = 0; q < n; q = q + 1) {
+            let k = keys[q];
+            let at = counts[k];
+            counts[k] = at + 6;
+            let v = q * 4;
+            out[at] = v;
+            out[at + 1] = v + 1;
+            out[at + 2] = v + 2;
+            out[at + 3] = v;
+            out[at + 4] = v + 2;
+            out[at + 5] = v + 3;
+        }
     }
-    print "average FPS: " + str(floor(frames / (sdl_time() - start)));
-    print "quads last frame: " + str(quad_count);
-    sdl_quit();
+
+    // Outlines the targeted face, after everything else so it draws on top. It needs no
+    // depth test: the ray reached this face, so little can be in front of it.
+    fn emit_highlight() {
+        if (!ray_hit) ret;
+        let first = quad_count;
+        let dx = hit_x - eye_x;
+        let dy = hit_y - eye_y;
+        let dz = hit_z - eye_z;
+        let o = hit_dir * 9;
+        emit_near_face(dx * rgt_x + dz * rgt_z + view_defs[o],
+                       dx * up_x + dy * up_y + dz * up_z + view_defs[o + 1],
+                       dx * fwd_x + dy * fwd_y + dz * fwd_z + view_defs[o + 2],
+                       hit_dir, TILE_U[TILE_HIGHLIGHT], TILE_V[TILE_HIGHLIGHT], 0, COLOR_WHITE, 1);
+        for (let q = first; q < quad_count; q = q + 1) {
+            let at = q * 6;
+            let v = q * 4;
+            indices[at] = v;
+            indices[at + 1] = v + 1;
+            indices[at + 2] = v + 2;
+            indices[at + 3] = v;
+            indices[at + 4] = v + 2;
+            indices[at + 5] = v + 3;
+        }
+    }
+
+    // ---------- main ----------
+
+    let atlas = -1;
+
+    fn load_atlas() {
+        atlas = sdl_load_texture("examples/minecraft/atlas.png");
+        if (atlas < 0) atlas = sdl_load_texture("atlas.png");
+        ret atlas >= 0;
+    }
+
+    fn draw_frame() {
+        sdl_clear(135, 190, 235);
+        sdl_draw_tris(atlas, verts, quad_count * 4, indices, quad_count * 6);
+        sdl_present();
+    }
+
+    fn main() {
+        sdl_init("LunarCraft", WIN_W, WIN_H);
+        if (!load_atlas()) { print "Could not load atlas.png"; sdl_quit(); ret; }
+        let t0 = sdl_time();
+        generate_world();
+        build_all_chunks();
+        init_render_buffers();
+        init_clip_buffers();
+        update_colors(1);
+        print "world ready in " + str(floor((sdl_time() - t0) * 1000)) + " ms";
+        spawn_player();
+        if (DEMO_SECONDS > 0) sdl_set_vsync(false);
+        else sdl_set_relative_mouse(true);
+
+        let start = sdl_time();
+        let last = start;
+        let frames = 0;
+        let running = true;
+        let next_action = 0;
+        while (running) {
+            if (sdl_poll() == "quit" || sdl_key_down("escape")) running = false;
+            let frame_start = sdl_time();
+            let dt = min(0.05, frame_start - last);
+            last = frame_start;
+
+            if (DEMO_SECONDS > 0) {
+                let now = frame_start - start;
+                yaw = 2.35 + now * 0.25;
+                step_player(dt, 1, 0, true);
+                if (now > DEMO_SECONDS) running = false;
+            } else {
+                look(sdl_mouse_dx(), sdl_mouse_dy());
+                let forward = 0;
+                let strafe = 0;
+                if (sdl_key_down("w")) forward = forward + 1;
+                if (sdl_key_down("s")) forward = forward - 1;
+                if (sdl_key_down("d")) strafe = strafe + 1;
+                if (sdl_key_down("a")) strafe = strafe - 1;
+                step_player(dt, forward, strafe, sdl_key_down("space"));
+            }
+            sync_eye();
+            update_camera();
+            raycast();
+
+            if (DEMO_SECONDS == 0) {
+                for (let i = 0; i < len(SLOT_KEYS); i = i + 1) {
+                    if (sdl_key_down(SLOT_KEYS[i])) selected_block = i + 1;
+                }
+                let wants_break = sdl_mouse_down(1);
+                let wants_place = sdl_mouse_down(3);
+                if (!wants_break && !wants_place) next_action = 0;
+                if ((wants_break || wants_place) && frame_start >= next_action) {
+                    if (wants_break) break_block(); else place_block();
+                    next_action = frame_start + ACTION_REPEAT;
+                }
+            }
+
+            project_world();
+            sort_quads();
+            emit_highlight();
+            draw_frame();
+            frames = frames + 1;
+        }
+        print "average FPS: " + str(floor(frames / (sdl_time() - start)));
+        print "quads last frame: " + str(quad_count);
+        sdl_quit();
+    }
+
+    main();
 }
 
-main();
+game();
