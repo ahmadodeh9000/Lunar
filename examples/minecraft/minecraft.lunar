@@ -192,11 +192,12 @@ fn build_all_chunks() {
 
 // ---------- camera ----------
 
-let eye_x = 3.5;
-let eye_y = 18;
-let eye_z = 3.5;
-let yaw = 0.6;
-let pitch = -0.5;
+let EYE_HEIGHT = 1.62;
+let eye_x = 0;
+let eye_y = 0;
+let eye_z = 0;
+let yaw = 2.35;
+let pitch = -0.2;
 
 let FOCAL = (WIN_H / 2) / tan(FOV_DEGREES * 3.14159265 / 360);
 let CX = WIN_W / 2;
@@ -243,6 +244,138 @@ fn update_camera() {
     CAM_PLANE[0] = eye_x;  CAM_PLANE[1] = -eye_x;
     CAM_PLANE[2] = eye_y;  CAM_PLANE[3] = -eye_y;
     CAM_PLANE[4] = eye_z;  CAM_PLANE[5] = -eye_z;
+}
+
+// ---------- player ----------
+
+let PLAYER_HALF_WIDTH = 0.3;
+let PLAYER_HEIGHT = 1.8;
+let COLLISION_GAP = 0.001;
+let WALK_SPEED = 4.6;
+let JUMP_SPEED = 7.8;
+let GRAVITY = 24;
+let MAX_FALL = 30;
+let MOUSE_SENSITIVITY = 0.0025;
+let MAX_PITCH = 1.55;
+
+let px = 0;
+let py = 0;
+let pz = 0;
+let vel_y = 0;
+let on_ground = false;
+
+// Unlike hides_face, this treats the world's sides as walls so the player stays inside.
+fn blocked(x, y, z) {
+    if (y < 0) ret true;
+    if (y >= SY) ret false;
+    if (x < 0 || x >= SX || z < 0 || z >= SZ) ret true;
+    ret world[x + z * SX + y * SXZ] != AIR;
+}
+
+fn box_hits_world(x, y, z) {
+    let hw = PLAYER_HALF_WIDTH;
+    let x1 = floor(x + hw);
+    let y1 = floor(y + PLAYER_HEIGHT);
+    let z1 = floor(z + hw);
+    for (let by = floor(y); by <= y1; by = by + 1) {
+        for (let bz = floor(z - hw); bz <= z1; bz = bz + 1) {
+            for (let bx = floor(x - hw); bx <= x1; bx = bx + 1) {
+                if (blocked(bx, by, bz)) ret true;
+            }
+        }
+    }
+    ret false;
+}
+
+fn move_axis_x(dx) {
+    if (dx == 0) ret;
+    let nx = px + dx;
+    if (box_hits_world(nx, py, pz)) {
+        if (dx > 0) nx = floor(nx + PLAYER_HALF_WIDTH) - PLAYER_HALF_WIDTH - COLLISION_GAP;
+        else nx = floor(nx - PLAYER_HALF_WIDTH) + 1 + PLAYER_HALF_WIDTH + COLLISION_GAP;
+        if (box_hits_world(nx, py, pz)) nx = px;
+    }
+    px = nx;
+}
+
+fn move_axis_z(dz) {
+    if (dz == 0) ret;
+    let nz = pz + dz;
+    if (box_hits_world(px, py, nz)) {
+        if (dz > 0) nz = floor(nz + PLAYER_HALF_WIDTH) - PLAYER_HALF_WIDTH - COLLISION_GAP;
+        else nz = floor(nz - PLAYER_HALF_WIDTH) + 1 + PLAYER_HALF_WIDTH + COLLISION_GAP;
+        if (box_hits_world(px, py, nz)) nz = pz;
+    }
+    pz = nz;
+}
+
+fn move_axis_y(dy) {
+    on_ground = false;
+    let ny = py + dy;
+    if (box_hits_world(px, ny, pz)) {
+        if (dy < 0) {
+            ny = floor(ny) + 1 + COLLISION_GAP;
+            on_ground = true;
+        } else {
+            ny = floor(ny + PLAYER_HEIGHT) - PLAYER_HEIGHT - COLLISION_GAP;
+        }
+        vel_y = 0;
+        if (box_hits_world(px, ny, pz)) ny = py;
+    }
+    py = ny;
+}
+
+// forward and strafe are -1, 0 or 1. Each axis resolves on its own, which lets the
+// player slide along walls.
+fn step_player(dt, forward, strafe, jump) {
+    let sy = sin(yaw);
+    let cy = cos(yaw);
+    let wx = sy * forward + cy * strafe;
+    let wz = -cy * forward + sy * strafe;
+    let wish = sqrt(wx * wx + wz * wz);
+    if (wish > 0) {
+        wx = wx / wish * WALK_SPEED;
+        wz = wz / wish * WALK_SPEED;
+    }
+    if (jump && on_ground) vel_y = JUMP_SPEED;
+    vel_y = max(vel_y - GRAVITY * dt, -MAX_FALL);
+    move_axis_x(wx * dt);
+    move_axis_z(wz * dt);
+    move_axis_y(vel_y * dt);
+}
+
+fn look(dx, dy) {
+    yaw = yaw + dx * MOUSE_SENSITIVITY;
+    pitch = min(MAX_PITCH, max(-MAX_PITCH, pitch - dy * MOUSE_SENSITIVITY));
+}
+
+fn sync_eye() {
+    eye_x = px;
+    eye_y = py + EYE_HEIGHT;
+    eye_z = pz;
+}
+
+// Starts on the open ground nearest the middle of the world, not on a treetop.
+fn spawn_player() {
+    let mid_x = SX / 2;
+    let mid_z = SZ / 2;
+    for (let r = 0; r < SX / 2; r = r + 1) {
+        for (let dz = -r; dz <= r; dz = dz + 1) {
+            for (let dx = -r; dx <= r; dx = dx + 1) {
+                let h = terrain_height(mid_x + dx, mid_z + dz);
+                if (get_block(mid_x + dx, h, mid_z + dz) == GRASS &&
+                    get_block(mid_x + dx, h + 1, mid_z + dz) == AIR) {
+                    px = mid_x + dx + 0.5;
+                    py = h + 1 + COLLISION_GAP;
+                    pz = mid_z + dz + 0.5;
+                    ret;
+                }
+            }
+        }
+    }
+    px = mid_x + 0.5;
+    py = SY;
+    pz = mid_z + 0.5;
 }
 
 // ---------- rendering ----------
@@ -602,18 +735,36 @@ fn main() {
     init_clip_buffers();
     update_colors(1);
     print "world ready in " + str(floor((sdl_time() - t0) * 1000)) + " ms";
+    spawn_player();
     if (DEMO_SECONDS > 0) sdl_set_vsync(false);
+    else sdl_set_relative_mouse(true);
 
     let start = sdl_time();
+    let last = start;
     let frames = 0;
     let running = true;
     while (running) {
         if (sdl_poll() == "quit" || sdl_key_down("escape")) running = false;
-        let now = sdl_time() - start;
+        let frame_start = sdl_time();
+        let dt = min(0.05, frame_start - last);
+        last = frame_start;
+
         if (DEMO_SECONDS > 0) {
-            yaw = 2.35 + now * 0.6;
+            let now = frame_start - start;
+            yaw = 2.35 + now * 0.25;
+            step_player(dt, 1, 0, true);
             if (now > DEMO_SECONDS) running = false;
+        } else {
+            look(sdl_mouse_dx(), sdl_mouse_dy());
+            let forward = 0;
+            let strafe = 0;
+            if (sdl_key_down("w")) forward = forward + 1;
+            if (sdl_key_down("s")) forward = forward - 1;
+            if (sdl_key_down("d")) strafe = strafe + 1;
+            if (sdl_key_down("a")) strafe = strafe - 1;
+            step_player(dt, forward, strafe, sdl_key_down("space"));
         }
+        sync_eye();
         update_camera();
         project_world();
         sort_quads();

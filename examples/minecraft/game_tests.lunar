@@ -1,0 +1,96 @@
+
+// ---------- tests, appended to minecraft.lunar by run_tests.sh ----------
+
+fn check(name, ok) {
+    if (!ok) print "FAIL " + name;
+}
+
+fn clear_world() {
+    for (let i = 0; i < len(world); i = i + 1) world[i] = AIR;
+}
+
+fn set_floor(y) {
+    for (let z = 0; z < SZ; z = z + 1) {
+        for (let x = 0; x < SX; x = x + 1) set_block(x, y, z, STONE);
+    }
+}
+
+fn run_steps(n, forward, strafe, jump) {
+    for (let i = 0; i < n; i = i + 1) step_player(1 / 60, forward, strafe, jump);
+}
+
+fn place_player(x, y, z) {
+    px = x; py = y; pz = z;
+    vel_y = 0;
+    on_ground = false;
+}
+
+fn test_physics() {
+    clear_world();
+    set_floor(0);
+    yaw = 0;   // facing -z
+
+    place_player(10.5, 5, 10.5);
+    run_steps(120, 0, 0, false);
+    check("lands on the floor", on_ground && abs(py - 1) < 0.01);
+
+    let ground = py;
+    let peak = py;
+    step_player(1 / 60, 0, 0, true);
+    check("jump leaves the ground", !on_ground && vel_y > 0);
+    for (let i = 0; i < 60; i = i + 1) { step_player(1 / 60, 0, 0, false); peak = max(peak, py); }
+    check("jump clears one block, not two", peak - ground > 1 && peak - ground < 2);
+    check("comes back down", on_ground);
+
+    let z0 = pz;
+    run_steps(60, 1, 0, false);
+    check("w moves toward -z at walking speed", abs((z0 - pz) - WALK_SPEED) < 0.2);
+
+    // wall at z = 5: stops at it from the +z side
+    for (let x = 0; x < SX; x = x + 1) { set_block(x, 1, 5, STONE); set_block(x, 2, 5, STONE); }
+    place_player(10.5, 1.01, 7.5);
+    run_steps(120, 1, 0, false);
+    check("stops at a wall", abs(pz - (6 + PLAYER_HALF_WIDTH)) < 0.01);
+    check("not stuck in the wall", !box_hits_world(px, py, pz));
+
+    // walking diagonally into it still slides along x
+    let x0 = px;
+    yaw = 0.7;
+    run_steps(30, 1, 0, false);
+    check("slides along a wall", px > x0 + 0.5 && abs(pz - (6 + PLAYER_HALF_WIDTH)) < 0.01);
+
+    // ceiling
+    set_block(20, 3, 20, STONE);
+    place_player(20.5, 1.01, 20.5);
+    on_ground = true;
+    run_steps(10, 0, 0, true);
+    check("ceiling stops a jump", py + PLAYER_HEIGHT <= 3 && !box_hits_world(px, py, pz));
+
+    // world edge
+    yaw = 0;
+    place_player(1.5, 1.01, 1.5);
+    run_steps(120, 1, 0, false);
+    check("world edge is a wall", pz >= PLAYER_HALF_WIDTH);
+
+    yaw = 0;
+    pitch = 0;
+    look(0, 100000);
+    check("pitch clamps looking down", pitch == -MAX_PITCH);
+    pitch = 0;
+}
+
+fn test_world() {
+    clear_world();
+    generate_world();
+    let solid = 0;
+    for (let i = 0; i < len(world); i = i + 1) { if (world[i] != AIR) solid = solid + 1; }
+    check("world has terrain", solid > SXZ * 2);
+    spawn_player();
+    check("spawn is clear", !box_hits_world(px, py, pz));
+    run_steps(10, 0, 0, false);
+    check("spawn stands on ground", on_ground);
+}
+
+test_world();
+test_physics();
+print "game tests: done";
