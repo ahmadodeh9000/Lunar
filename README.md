@@ -790,6 +790,8 @@ sdl_quit();
 | `1`-`8` | Select a block type |
 | `Esc` | Quit |
 
+For how it works, including a line-by-line explanation of the code, see [its README](examples/minecraft/README.md).
+
 Frame timings print to the terminal every 2 seconds. Test the game logic without a window using `sh examples/minecraft/run_tests.sh`.
 
 ---
