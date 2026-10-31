@@ -22,7 +22,7 @@ fn game() {
     let SUBDIVISIONS = 4;
     let MAX_QUADS = 9000;
 
-    // Set above 0 to fly a scripted benchmark for that many seconds, uncapped, then exit.
+    // Set above 0 to spin in place for that many seconds with vsync off, then exit.
     let DEMO_SECONDS = 0;
 
     // ---------- world ----------
@@ -845,9 +845,110 @@ fn game() {
         }
     }
 
-    // ---------- main ----------
+    // ---------- HUD ----------
 
     let atlas = -1;
+
+    // 3x5 pixel glyphs, one bit per pixel, top row in the high bits. Digits, then F, P, S.
+    let GLYPHS = [31599, 11415, 29671, 29647, 23497, 31183, 31215, 29257, 31727, 31695, 31204, 31716, 31183];
+    let GLYPH_F = 10;
+    let GLYPH_P = 11;
+    let GLYPH_S = 12;
+    let SLOT_SIZE = 44;
+    let SLOT_COUNT = len(SLOT_KEYS);
+    let hotbar_x = (WIN_W - SLOT_COUNT * SLOT_SIZE) / 2;
+    let hotbar_y = WIN_H - SLOT_SIZE - 10;
+    let icon_verts = [];
+    let icon_indices = [];
+
+    fn add_icon_vertex(x, y, u, v) {
+        push(icon_verts, x); push(icon_verts, y); push(icon_verts, u); push(icon_verts, v);
+        push(icon_verts, COLOR_WHITE);
+    }
+
+    fn init_hud() {
+        let pad = 6;
+        let size = SLOT_SIZE - 2 * pad;
+        for (let i = 0; i < SLOT_COUNT; i = i + 1) {
+            let t = TILE_SIDE[i + 1];
+            let u = TILE_U[t];
+            let v = TILE_V[t];
+            let x = hotbar_x + i * SLOT_SIZE + pad;
+            let y = hotbar_y + pad;
+            add_icon_vertex(x, y, u, v);
+            add_icon_vertex(x + size, y, u + TILE_DU, v);
+            add_icon_vertex(x + size, y + size, u + TILE_DU, v + TILE_DU);
+            add_icon_vertex(x, y + size, u, v + TILE_DU);
+            let b = i * 4;
+            push(icon_indices, b); push(icon_indices, b + 1); push(icon_indices, b + 2);
+            push(icon_indices, b); push(icon_indices, b + 2); push(icon_indices, b + 3);
+        }
+    }
+
+    fn draw_glyph(g, x, y, s) {
+        let bits = GLYPHS[g];
+        for (let row = 0; row < 5; row = row + 1) {
+            for (let col = 0; col < 3; col = col + 1) {
+                if (((bits >> (14 - row * 3 - col)) & 1) == 1) {
+                    sdl_fill_rect(x + col * s, y + row * s, s, s, 255, 255, 255, 255);
+                }
+            }
+        }
+    }
+
+    // Draws a non-negative whole number with its last digit ending at x.
+    fn draw_number(n, x, y, s) {
+        let v = n;
+        while (v >= 10) {
+            draw_glyph(v - floor(v / 10) * 10, x, y, s);
+            v = floor(v / 10);
+            x = x - 4 * s;
+        }
+        draw_glyph(v, x, y, s);
+    }
+
+    fn draw_hud(fps) {
+        // crosshair
+        sdl_fill_rect(CX - 8, CY - 1, 16, 2, 255, 255, 255, 220);
+        sdl_fill_rect(CX - 1, CY - 8, 2, 16, 255, 255, 255, 220);
+
+        // hotbar
+        sdl_fill_rect(hotbar_x, hotbar_y, SLOT_COUNT * SLOT_SIZE, SLOT_SIZE, 0, 0, 0, 110);
+        sdl_draw_tris(atlas, icon_verts, SLOT_COUNT * 4, icon_indices, SLOT_COUNT * 6);
+        let sel = hotbar_x + (selected_block - 1) * SLOT_SIZE;
+        sdl_fill_rect(sel, hotbar_y, SLOT_SIZE, 3, 255, 255, 255, 255);
+        sdl_fill_rect(sel, hotbar_y + SLOT_SIZE - 3, SLOT_SIZE, 3, 255, 255, 255, 255);
+        sdl_fill_rect(sel, hotbar_y, 3, SLOT_SIZE, 255, 255, 255, 255);
+        sdl_fill_rect(sel + SLOT_SIZE - 3, hotbar_y, 3, SLOT_SIZE, 255, 255, 255, 255);
+
+        // FPS
+        sdl_fill_rect(6, 6, 104, 24, 0, 0, 0, 110);
+        draw_glyph(GLYPH_F, 12, 10, 3);
+        draw_glyph(GLYPH_P, 24, 10, 3);
+        draw_glyph(GLYPH_S, 36, 10, 3);
+        draw_number(floor(fps), 96, 10, 3);
+    }
+
+    // ---------- day and night ----------
+
+    let DAY_LENGTH = 240;     // seconds
+    let MIN_LIGHT = 0.28;
+    let sky_r = 135;
+    let sky_g = 190;
+    let sky_b = 235;
+
+    // Starts at noon. Far faces fade toward whatever is behind them, so the fog follows
+    // the sky color by itself.
+    fn update_daylight(seconds) {
+        let sun = (cos(seconds / DAY_LENGTH * 6.2831853) + 1) / 2;
+        let light = MIN_LIGHT + (1 - MIN_LIGHT) * sun;
+        update_colors(light);
+        sky_r = 12 + 123 * sun;
+        sky_g = 16 + 174 * sun;
+        sky_b = 40 + 195 * sun;
+    }
+
+    // ---------- main ----------
 
     fn load_atlas() {
         atlas = sdl_load_texture("examples/minecraft/atlas.png");
@@ -855,10 +956,17 @@ fn game() {
         ret atlas >= 0;
     }
 
-    fn draw_frame() {
-        sdl_clear(135, 190, 235);
-        sdl_draw_tris(atlas, verts, quad_count * 4, indices, quad_count * 6);
-        sdl_present();
+    let PHASE_NAMES = ["input+physics", "project", "sort", "draw", "present"];
+    let phase_times = [0, 0, 0, 0, 0];
+
+    fn print_timings(frames) {
+        let line = str(floor(quad_count)) + " quads |";
+        for (let i = 0; i < len(PHASE_NAMES); i = i + 1) {
+            let ms = floor(phase_times[i] / frames * 10000) / 10;
+            line = line + " " + PHASE_NAMES[i] + " " + str(ms) + " ms";
+            phase_times[i] = 0;
+        }
+        print line;
     }
 
     fn main() {
@@ -869,7 +977,8 @@ fn game() {
         build_all_chunks();
         init_render_buffers();
         init_clip_buffers();
-        update_colors(1);
+        init_hud();
+        sdl_set_blend(true);
         print "world ready in " + str(floor((sdl_time() - t0) * 1000)) + " ms";
         spawn_player();
         if (DEMO_SECONDS > 0) sdl_set_vsync(false);
@@ -877,19 +986,26 @@ fn game() {
 
         let start = sdl_time();
         let last = start;
-        let frames = 0;
+        let total_frames = 0;
         let running = true;
         let next_action = 0;
+        let next_daylight = 0;
+        let fps = 0;
+        let fps_frames = 0;
+        let fps_since = start;
+        let timing_frames = 0;
+        let timing_since = start;
+
         while (running) {
+            let t0 = sdl_time();
             if (sdl_poll() == "quit" || sdl_key_down("escape")) running = false;
-            let frame_start = sdl_time();
-            let dt = min(0.05, frame_start - last);
-            last = frame_start;
+            let dt = min(0.05, t0 - last);
+            last = t0;
+            let now = t0 - start;
 
             if (DEMO_SECONDS > 0) {
-                let now = frame_start - start;
-                yaw = 2.35 + now * 0.25;
-                step_player(dt, 1, 0, true);
+                yaw = 2.35 + now * 0.5;
+                step_player(dt, 0, 0, false);
                 if (now > DEMO_SECONDS) running = false;
             } else {
                 look(sdl_mouse_dx(), sdl_mouse_dy());
@@ -906,26 +1022,58 @@ fn game() {
             raycast();
 
             if (DEMO_SECONDS == 0) {
-                for (let i = 0; i < len(SLOT_KEYS); i = i + 1) {
+                for (let i = 0; i < SLOT_COUNT; i = i + 1) {
                     if (sdl_key_down(SLOT_KEYS[i])) selected_block = i + 1;
                 }
                 let wants_break = sdl_mouse_down(1);
                 let wants_place = sdl_mouse_down(3);
                 if (!wants_break && !wants_place) next_action = 0;
-                if ((wants_break || wants_place) && frame_start >= next_action) {
+                if ((wants_break || wants_place) && t0 >= next_action) {
                     if (wants_break) break_block(); else place_block();
-                    next_action = frame_start + ACTION_REPEAT;
+                    next_action = t0 + ACTION_REPEAT;
+                    raycast();
                 }
             }
+            if (now >= next_daylight) {
+                update_daylight(now);
+                next_daylight = now + 1;
+            }
 
+            let t1 = sdl_time();
             project_world();
+            let t2 = sdl_time();
             sort_quads();
             emit_highlight();
-            draw_frame();
-            frames = frames + 1;
+            let t3 = sdl_time();
+            sdl_clear(sky_r, sky_g, sky_b);
+            sdl_draw_tris(atlas, verts, quad_count * 4, indices, quad_count * 6);
+            draw_hud(fps);
+            let t4 = sdl_time();
+            sdl_present();
+            let t5 = sdl_time();
+
+            phase_times[0] = phase_times[0] + t1 - t0;
+            phase_times[1] = phase_times[1] + t2 - t1;
+            phase_times[2] = phase_times[2] + t3 - t2;
+            phase_times[3] = phase_times[3] + t4 - t3;
+            phase_times[4] = phase_times[4] + t5 - t4;
+
+            total_frames = total_frames + 1;
+            fps_frames = fps_frames + 1;
+            timing_frames = timing_frames + 1;
+            if (t5 - fps_since >= 0.5) {
+                fps = fps_frames / (t5 - fps_since);
+                fps_frames = 0;
+                fps_since = t5;
+            }
+            if (t5 - timing_since >= 2) {
+                print_timings(timing_frames);
+                timing_frames = 0;
+                timing_since = t5;
+            }
         }
-        print "average FPS: " + str(floor(frames / (sdl_time() - start)));
-        print "quads last frame: " + str(quad_count);
+        print "average FPS: " + str(floor(total_frames / (sdl_time() - start)));
+        sdl_set_relative_mouse(false);
         sdl_quit();
     }
 

@@ -772,6 +772,28 @@ sdl_quit();
 
 ---
 
+## Example: Voxel Game
+
+`examples/minecraft/` is a small Minecraft-style game written in Lunar, with terrain, trees, block breaking and placing, collision, fog, and a day/night cycle. Build with `make sdl`, then run it from the repo root:
+
+```bash
+./lunar examples/minecraft/minecraft.lunar
+```
+
+| Input | Action |
+|---|---|
+| Mouse | Look |
+| `W` `A` `S` `D` | Move |
+| `Space` | Jump |
+| Left click | Break the targeted block |
+| Right click | Place the selected block |
+| `1`-`8` | Select a block type |
+| `Esc` | Quit |
+
+Frame timings print to the terminal every 2 seconds. Test the game logic without a window using `sh examples/minecraft/run_tests.sh`.
+
+---
+
 ## Benchmarks
 
 <!-- BENCH:START -->
@@ -805,7 +827,7 @@ Notes:
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
 - No file or stdin I/O, and no module system
 - A runtime error aborts the script; there is no error handling
-- Each function (and the top-level script) can reference at most 256 distinct constants
+- Each function (and the top-level script) can reference at most 256 distinct constants. At the top level this includes the name of every global referenced and two entries per function, so a large program may need to live inside one function
 - `print` on an array that contains itself recurses without end
 - Arrays can't be passed to FFI functions yet
 
