@@ -268,6 +268,29 @@ static Value sdl_delay_native(i32 argc, Value* args) {
     return NIL_VAL;
 }
 
+// sdl_time() -> wall-clock seconds, unlike clock() which counts CPU time
+// and so misses time spent waiting on vsync
+static Value sdl_time_native(i32 argc, Value* args) {
+    static Uint64 start = 0;
+    Uint64 now = SDL_GetPerformanceCounter();
+    if (start == 0) start = now;
+    return NUMBER_VAL((double)(now - start) / (double)SDL_GetPerformanceFrequency());
+}
+
+// sdl_set_vsync(bool) -> true on success
+static Value sdl_set_vsync_native(i32 argc, Value* args) {
+    if (argc < 1 || !IS_BOOL(args[0]) || renderer == NULL) return BOOL_VAL(false);
+    return BOOL_VAL(SDL_RenderSetVSync(renderer, AS_BOOL(args[0]) ? 1 : 0) == 0);
+}
+
+// sdl_set_blend(bool) -> makes alpha apply to sdl_fill_rect and untextured
+// triangles; off by default
+static Value sdl_set_blend_native(i32 argc, Value* args) {
+    if (argc < 1 || !IS_BOOL(args[0]) || renderer == NULL) return BOOL_VAL(false);
+    SDL_BlendMode mode = AS_BOOL(args[0]) ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE;
+    return BOOL_VAL(SDL_SetRenderDrawBlendMode(renderer, mode) == 0);
+}
+
 void register_sdl_natives() {
     define_native("sdl_init",           sdl_init_native);
     define_native("sdl_quit",           sdl_quit_native);
@@ -281,6 +304,9 @@ void register_sdl_natives() {
     define_native("sdl_draw_texture",   sdl_draw_texture_native);
     define_native("sdl_texture_width",  sdl_texture_width_native);
     define_native("sdl_texture_height", sdl_texture_height_native);
+    define_native("sdl_time",           sdl_time_native);
+    define_native("sdl_set_vsync",      sdl_set_vsync_native);
+    define_native("sdl_set_blend",      sdl_set_blend_native);
 }
 
 #endif

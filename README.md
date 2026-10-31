@@ -457,7 +457,7 @@ print factorial(10);   // 3628800
 | Function      | Signature                    | Description                                               |
 |---------------|------------------------------|-----------------------------------------------------------|
 | `print`       | `print x`                    | Print a value followed by a newline                       |
-| `clock()`     | `() → number`                | Seconds since program start                               |
+| `clock()`     | `() → number`                | CPU seconds used by the program (not wall-clock time)     |
 | `sqrt(x)`     | `(number) → number`          | Square root                                               |
 | `abs(x)`      | `(number) → number`          | Absolute value                                            |
 | `floor(x)`    | `(number) → number`          | Round toward negative infinity                            |
@@ -597,6 +597,7 @@ sdl_quit();
 sdl_clear(r, g, b)                     // clear screen with a color
 sdl_fill_rect(x, y, w, h, r, g, b, a)  // filled rectangle
 sdl_present()                          // flip buffer to screen
+sdl_set_blend(true)                    // make alpha apply to rects and untextured triangles (default off)
 ```
 
 ### Textures
@@ -627,7 +628,9 @@ sdl_key_down("left")     // true if the key is currently held
 ### Timing
 
 ```lunar
-sdl_delay(16)  // sleep in ms; use in the loop for a ~60fps cap
+sdl_delay(16)        // sleep in ms; use in the loop for a ~60fps cap
+sdl_time()           // wall-clock seconds; use this for FPS, since clock() skips vsync waits
+sdl_set_vsync(false) // vsync is on by default; turn it off to measure uncapped FPS
 ```
 
 ---
