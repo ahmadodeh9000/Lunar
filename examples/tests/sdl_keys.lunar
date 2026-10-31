@@ -1,0 +1,9 @@
+// Opens a window briefly. Nothing is pressed, so every known key is up; this
+// checks that each form of key name is accepted without error.
+sdl_init("sdl_keys", 200, 100);
+let names = ["w", "1", "f5", "up", "space", "shift", "Left Shift", "Page Up", "no such key"];
+for (let i = 0; i < len(names); i = i + 1) {
+    if (sdl_key_down(names[i]) != false) print "FAIL " + names[i];
+}
+sdl_quit();
+print "sdl_keys: done";

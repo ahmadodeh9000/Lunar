@@ -184,7 +184,12 @@ static bool lookup_scancode(const char* key, SDL_Scancode* out) {
             return true;
         }
     }
-    return false;
+
+    // any other SDL key name, e.g. "Left Shift"
+    SDL_Scancode code = SDL_GetScancodeFromName(key);
+    if (code == SDL_SCANCODE_UNKNOWN) return false;
+    *out = code;
+    return true;
 }
 
 static Value sdl_key_down_native(i32 argc, Value* args) {

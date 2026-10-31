@@ -618,8 +618,10 @@ Textures are freed automatically on `sdl_quit()`. There is currently no way to u
 let e = sdl_poll();      // "quit" | nil; handles every pending event, call once per frame
 
 sdl_key_down("left")     // true if the key is currently held
-                         // keys: "up" "down" "left" "right"
-                         //       "space" "escape" "w" "a" "s" "d"
+                         // keys: letters and digits ("w", "1"), "f1"-"f12",
+                         //       short names ("up", "space", "escape", "shift", "ctrl", "tab", "kp0", ...),
+                         //       or any SDL scancode name ("Left Shift", "Page Up", ...)
+                         // an unknown name is simply never down
 ```
 
 ### Timing
