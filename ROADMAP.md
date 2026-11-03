@@ -25,4 +25,5 @@ Known issues and ideas that are not part of a milestone yet.
 - `finally` for try / catch.
 - More string escapes: `\r`, `\0`, and `\u{...}` for Unicode code points.
 - Errors thrown inside a Lunar callback called from a native (e.g. a future `sort` with a compare function) must propagate correctly across the C call. Today no native calls back into Lunar.
+- Windows build: the module code uses `realpath`, `getcwd`, and `stat` (POSIX only).
 - `define_native` assumes an empty VM stack (it uses slots 0 and 1). Fix it when built-in modules arrive.
