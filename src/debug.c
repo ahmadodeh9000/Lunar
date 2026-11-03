@@ -27,6 +27,14 @@ static i32 jump_instruction(const char* name, int sign, Chunk* chunk, i32 offset
     return offset + 3;
 }
 
+static i32 for_iter_instruction(Chunk* chunk, i32 offset) {
+    u8  slot  = chunk->code[offset + 1];
+    u8  nvars = chunk->code[offset + 2];
+    u16 jump  = (u16)((chunk->code[offset+3] << 8) | chunk->code[offset+4]);
+    printf("%-20s %4d (%d vars) -> %d\n", "OP_FOR_ITER", slot, nvars, offset + 5 + (int)jump);
+    return offset + 5;
+}
+
 static i32 invoke_instruction(const char* name, Chunk* chunk, i32 offset) {
     u8 c    = chunk->code[offset + 1];
     u8 argc = chunk->code[offset + 2];
@@ -165,6 +173,8 @@ i32 disassemble_instruction(Chunk* chunk, i32 offset) {
         case OP_APPEND_ARRAY:       return byte_instruction("OP_APPEND_ARRAY", chunk, offset);
         case OP_BUILD_MAP:          return byte_instruction("OP_BUILD_MAP", chunk, offset);
         case OP_APPEND_MAP:         return byte_instruction("OP_APPEND_MAP", chunk, offset);
+        case OP_ITER_PREP:          return byte_instruction("OP_ITER_PREP", chunk, offset);
+        case OP_FOR_ITER:           return for_iter_instruction(chunk, offset);
         case OP_WIDE:               return wide_instruction(chunk, offset);
         default:
             printf("Unknown opcode %d\n", instr);

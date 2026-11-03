@@ -76,7 +76,14 @@ static TokenType identifier_type() {
     switch (scanner.start[0]) {
         case 'b': return checkKeyword(1,4,"reak",TOKEN_BREAK);
         case 'c': return checkKeyword(1,7,"ontinue",TOKEN_CONTINUE);
-        case 'i': return checkKeyword(1,1,"f",TOKEN_IF);
+        case 'i':
+            if (scanner.curr - scanner.start > 1) {
+                switch (scanner.start[1]) {
+                    case 'f': return checkKeyword(2,0,"",TOKEN_IF);
+                    case 'n': return checkKeyword(2,0,"",TOKEN_IN);
+                }
+            }
+            break;
         case 'e': return checkKeyword(1,3,"lse",TOKEN_ELSE);
         case 'l': return checkKeyword(1,2,"et",TOKEN_LET);
         case 'w': return checkKeyword(1,4,"hile",TOKEN_WHILE);
@@ -174,4 +181,11 @@ Token scan_token() {
             else                 return make_token(TOKEN_GREATER);
     }
     return err_token("Unexpected character.");
+}
+
+Token peek_token() {
+    Scanner saved = scanner;
+    Token tok = scan_token();
+    scanner = saved;
+    return tok;
 }

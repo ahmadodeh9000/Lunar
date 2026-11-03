@@ -1,0 +1,42 @@
+// Each iteration gets fresh loop variables, so closures keep that iteration's value.
+let fns = [];
+for (x in [1, 2, 3]) {
+    fn get() { ret x; }
+    push(fns, get);
+}
+print [fns[0](), fns[1](), fns[2]()];
+
+let pairs = [];
+for (k, v in { a: 1, b: 2 }) {
+    fn get() { ret k + str(v); }
+    push(pairs, get);
+}
+print [pairs[0](), pairs[1]()];
+
+let chars = [];
+for (c in "xyz") {
+    fn get() { ret c; }
+    push(chars, get);
+}
+print [chars[0](), chars[1](), chars[2]()];
+
+// assigning to the loop variable doesn't change the loop
+let seen = [];
+for (i, x in [10, 20, 30]) {
+    push(seen, x);
+    x = 999;
+    i = 100;
+}
+print seen;
+
+// a closure can update its own iteration's variable
+let setters = [];
+let getters = [];
+for (x in [1, 2]) {
+    fn set(v) { x = v; }
+    fn get() { ret x; }
+    push(setters, set);
+    push(getters, get);
+}
+setters[0](50);
+print [getters[0](), getters[1]()];

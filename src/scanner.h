@@ -32,7 +32,7 @@ typedef enum {
     TOKEN_PRINT, TOKEN_RET,
     TOKEN_TRUE, TOKEN_LET, TOKEN_WHILE, TOKEN_STRUCT,
     TOKEN_SELF, TOKEN_SUPER,
-    TOKEN_BREAK, TOKEN_CONTINUE,
+    TOKEN_BREAK, TOKEN_CONTINUE, TOKEN_IN,
 
     TOKEN_ERROR, TOKEN_EOF
 } TokenType;
@@ -46,5 +46,6 @@ typedef struct {
 
 void  init_scanner(const char* src);
 Token scan_token();
+Token peek_token();     // the token after the current one, without consuming it
 
 #endif

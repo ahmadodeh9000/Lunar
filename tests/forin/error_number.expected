@@ -1,0 +1,4 @@
+-- stderr --
+Can only loop over arrays, maps, and strings.
+[line 1] in script
+-- exit 100 --

@@ -748,6 +748,7 @@ ParseRule rules[] = {
     [TOKEN_WHILE]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_BREAK]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_CONTINUE]            = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_IN]                  = {NULL,       NULL,    PREC_NONE},
     [TOKEN_ERROR]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_EOF]                 = {NULL,       NULL,    PREC_NONE},
 };
@@ -834,10 +835,67 @@ static void while_statement() {
     end_loop();     // after the condition's pop: a break has no condition on the stack
 }
 
+// for (x in seq) or for (k, v in seq); for_statement has begun the scope and read '('.
+// Three hidden locals hold the collection, the items to walk (the array itself, a
+// map's keys, or a string's characters), and the position. The loop variables live
+// in a scope of their own, so each iteration gets fresh ones.
+static void for_in_statement() {
+    consume(TOKEN_IDENTIFIER, "Expect loop variable name.");
+    Token first = parser.prev;
+    Token second;
+    bool  two = false;
+    if (match(TOKEN_COMMA)) {
+        consume(TOKEN_IDENTIFIER, "Expect second loop variable name.");
+        second = parser.prev;
+        two    = true;
+        if (identifiers_equal(&first, &second))
+            error("Already a variable with this name in this scope.");
+    }
+    consume(TOKEN_IN, "Expect 'in' after loop variable.");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after loop collection.");
+
+    int base = current->local_count;
+    add_local(synthetic_token(" seq"));   mark_initialized();
+    emit_bytes(OP_ITER_PREP, two ? 2 : 1);
+    add_local(synthetic_token(" items")); mark_initialized();
+    emit_const(NUMBER_VAL(0));
+    add_local(synthetic_token(" i"));     mark_initialized();
+
+    int loop_start = current_chunk()->count;
+    emit_bytes(OP_FOR_ITER, (u8)base);
+    emit_byte(two ? 2 : 1);
+    int exit_jump = current_chunk()->count;
+    emit_bytes(0xff, 0xff);
+
+    Loop loop;
+    begin_loop(&loop, loop_start);
+    begin_scope();
+    add_local(first);  mark_initialized();
+    if (two) { add_local(second); mark_initialized(); }
+    statement();
+    end_scope();
+    emit_loop(loop_start);
+
+    patch_jump(exit_jump);
+    end_loop();
+}
+
 static void for_statement() {
     begin_scope();
 
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
+
+    // a name followed by 'in', ',' or another name can't start a C-style initializer
+    // (the last is a for-in with a typo, like `for (x of xs)`)
+    if (check(TOKEN_IDENTIFIER)) {
+        TokenType next = peek_token().type;
+        if (next == TOKEN_IN || next == TOKEN_COMMA || next == TOKEN_IDENTIFIER) {
+            for_in_statement();
+            end_scope();
+            return;
+        }
+    }
 
     // initializer
     if (match(TOKEN_SEMICOLON)) {

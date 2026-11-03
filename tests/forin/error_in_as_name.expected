@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at 'in': Expect variable name.
+-- exit 110 --

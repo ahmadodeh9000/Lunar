@@ -212,6 +212,17 @@ static bool add_map_pairs(ObjMap* map, Value* pairs, int n) {
     return true;
 }
 
+// bytes in the UTF-8 character at s; a malformed one counts as a single byte
+static int utf8_char_length(const char* s, int remaining) {
+    u8 c = (u8)s[0];
+    int n = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : (c >> 3) == 0x1E ? 4 : 1;
+    if (n > remaining) return 1;
+    for (int i = 1; i < n; i++) {
+        if (((u8)s[i] & 0xC0) != 0x80) return 1;
+    }
+    return n;
+}
+
 static bool invoke_from_class(ObjStruct* klass, ObjString* name, int argc) {
     Value method;
     if(!table_get(klass->methods,name,&method)){ runtime_error("Undefined property '%s'.",name->chars); return false; }
@@ -366,6 +377,62 @@ static InterpretResult run() {
                 ObjMap* map = AS_MAP(peek(2*n));
                 if (!add_map_pairs(map, lvm.stack_top - 2*n, n)) return INTERPRET_RUNTIME_ERR;
                 lvm.stack_top -= 2*n;                 // drop the pairs, keep the map
+                break;
+            }
+
+            // for-in: the collection is on top; push the items the loop walks
+            case OP_ITER_PREP: {
+                int nvars = READ_BYTE();
+                Value seq = peek(0);
+                if (IS_ARRAY(seq)) { push(seq); break; }        // walked live, no copy
+                if (IS_MAP(seq)) {
+                    ObjMap* m = AS_MAP(seq);
+                    ObjArray* items = new_array();                // seq is still on the stack
+                    for (int i = 0; i < m->count; i++) {
+                        if (!IS_NIL(m->entries[i].key)) write_value_array(&items->items, m->entries[i].key);
+                    }
+                    push(OBJ_VAL(items));
+                    break;
+                }
+                if (IS_STRING(seq)) {
+                    if (nvars == 2) {
+                        runtime_error("Two-variable for-in isn't supported on strings yet.");
+                        return INTERPRET_RUNTIME_ERR;
+                    }
+                    ObjString* s = AS_STRING(seq);
+                    ObjArray* items = new_array();
+                    push(OBJ_VAL(items));                         // root it before copying characters
+                    for (int i = 0; i < s->length; ) {
+                        int n = utf8_char_length(s->chars + i, s->length - i);
+                        write_value_array(&items->items, OBJ_VAL(copy_str(s->chars + i, n)));
+                        i += n;
+                    }
+                    break;
+                }
+                runtime_error("Can only loop over arrays, maps, and strings.");
+                return INTERPRET_RUNTIME_ERR;
+            }
+
+            // for-in step: slots base, base+1, base+2 hold the collection, items, and position
+            case OP_FOR_ITER: {
+                Value* base = frame->slots + READ_BYTE();
+                int nvars   = READ_BYTE();
+                u16 exit    = READ_SHORT();
+                ObjArray* items = AS_ARRAY(base[1]);
+                i32 i = (i32)AS_NUMBER(base[2]);
+                if (IS_MAP(base[0])) {
+                    Value v;
+                    while (i < items->items.count && !map_get(AS_MAP(base[0]), items->items.values[i], &v)) i++;   // removed since
+                    if (i >= items->items.count) { frame->ip += exit; break; }
+                    base[2] = NUMBER_VAL(i + 1);
+                    push(items->items.values[i]);
+                    if (nvars == 2) push(v);
+                    break;
+                }
+                if (i >= items->items.count) { frame->ip += exit; break; }   // arrays: length checked live
+                base[2] = NUMBER_VAL(i + 1);
+                if (nvars == 2) push(NUMBER_VAL(i));
+                push(items->items.values[i]);
                 break;
             }
 

@@ -1,0 +1,4 @@
+-- stderr --
+Two-variable for-in isn't supported on strings yet.
+[line 1] in script
+-- exit 100 --

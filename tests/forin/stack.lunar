@@ -1,0 +1,30 @@
+// for-in pops exactly its own locals, however the loop ends.
+fn check() {
+    let before = "before";
+    for (x in [1, 2, 3]) { let a = x; let b = a; }
+    for (k, v in { a: 1 }) { let c = v; break; }
+    for (c in "ab") { let d = c; continue; }
+    for (x in []) { let e = 1; }
+    let after = "after";
+    print before;
+    print after;
+}
+check();
+
+// 100000 iterations with locals, break, and continue
+let big = [];
+for (let i = 0; i < 100000; i = i + 1) push(big, i);
+let odd = 0;
+for (i, x in big) {
+    let a = x;
+    let b = a + 1;
+    if (x % 2 == 0) continue;
+    odd = odd + 1;
+}
+print odd;
+let rounds = 0;
+for (x in big) {
+    rounds = rounds + 1;
+    for (y in [1, 2, 3]) { let z = y; break; }
+}
+print rounds;

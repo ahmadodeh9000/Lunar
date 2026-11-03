@@ -1,0 +1,14 @@
+// for-in walks strings by UTF-8 character; malformed bytes come out one at a time.
+let out = [];
+for (c in "héllo") push(out, c);
+print out;
+print len(out);
+print len("héllo");                 // len counts bytes
+let n = 0;
+for (c in "€😀a") n = n + 1;      // a 3-byte, a 4-byte, and a 1-byte character
+print n;
+for (c in "€😀a") print len(c);
+let bad = 0;
+for (c in "a�b�") bad = bad + 1;   // a stray byte, and a cut-off 2-byte character at the end
+print bad;
+for (c in "�(") print len(c);         // a lead byte followed by a non-continuation byte

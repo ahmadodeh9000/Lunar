@@ -1,0 +1,16 @@
+// for-in allocates (map key lists, string characters); run under the GC stress build too.
+fn words(n) {
+    let m = {};
+    for (let i = 0; i < n; i = i + 1) m["w" + str(i)] = "value" + str(i);
+    ret m;
+}
+let total = 0;
+for (round in [1, 2, 3, 4, 5]) {
+    for (k, v in words(40)) total = total + len(k) + len(v);
+    for (c in "some text " + str(round)) total = total + len(c);
+}
+print total;
+let chars = [];
+for (c in "garbage" + " collected" + " string") push(chars, c);
+print len(chars);
+print chars[0] + chars[len(chars) - 1];

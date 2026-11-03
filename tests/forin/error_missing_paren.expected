@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at 'print': Expect ')' after loop collection.
+-- exit 110 --

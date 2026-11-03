@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at 'of': Expect 'in' after loop variable.
+-- exit 110 --

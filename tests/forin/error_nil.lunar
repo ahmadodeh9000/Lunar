@@ -1,0 +1,2 @@
+print "before";
+for (x in nil) print x;

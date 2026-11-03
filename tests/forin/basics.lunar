@@ -1,0 +1,63 @@
+// for-in over arrays, maps, and strings, with one and two variables.
+for (x in [10, 20, 30]) print x;
+for (i, x in ["a", "b", "c"]) print str(i) + x;
+for (k in { hp: 10, mp: 5, 3: "three" }) print k;
+for (k, v in { hp: 10, mp: 5 }) print k + "=" + str(v);
+for (c in "abc") print c;
+
+// empty collections run the body zero times
+for (x in []) print "never";
+for (k in {}) print "never";
+for (k, v in {}) print "never";
+for (c in "") print "never";
+print "empties done";
+
+// the collection is evaluated once
+let calls = 0;
+fn make() { calls = calls + 1; ret [1, 2, 3]; }
+let sum = 0;
+for (x in make()) sum = sum + x;
+print [sum, calls];
+
+// a block body, nested loops, and a loop variable shadowing an outer name
+let x = "outer";
+for (x in [1, 2]) {
+    for (y in ["a", "b"]) {
+        print str(x) + y;
+    }
+}
+print x;
+
+// the collection can name the same variable the loop declares: it's the outer one
+let items = [7, 8];
+for (items in items) print items;
+print items;
+
+// nested data
+let world = { players: [{ name: "a", hp: 1 }, { name: "b", hp: 2 }] };
+let total = 0;
+for (p in world.players) total = total + p.hp;
+print total;
+for (i, row in [[1, 2], [3, 4]]) {
+    for (j, cell in row) print str(i) + str(j) + ":" + str(cell);
+}
+
+// inside a function and a method
+fn sum_of(arr) {
+    let s = 0;
+    for (n in arr) s = s + n;
+    ret s;
+}
+print sum_of([1, 2, 3, 4]);
+struct Bag {
+    init() { self.items = { sword: 1, shield: 2 }; }
+    count() {
+        let n = 0;
+        for (k, v in self.items) n = n + v;
+        ret n;
+    }
+}
+print Bag().count();
+
+// for-in still leaves C-style for loops alone
+for (let i = 0; i < 2; i = i + 1) print i;

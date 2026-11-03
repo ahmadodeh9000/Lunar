@@ -1,0 +1,2 @@
+struct S {}
+for (x in S()) print x;

@@ -1,0 +1,44 @@
+// break and continue in for-in loops.
+for (x in [1, 2, 3, 4, 5]) {
+    if (x == 2) continue;
+    if (x == 4) break;
+    print x;
+}
+for (k, v in { a: 1, b: 2, c: 3 }) {
+    if (k == "b") continue;
+    print k + str(v);
+}
+for (c in "hello") {
+    if (c == "l") break;
+    print c;
+}
+
+// nested: break only leaves the inner loop
+for (x in [1, 2]) {
+    for (y in [10, 20, 30]) {
+        if (y == 20) break;
+        print x + y;
+    }
+}
+
+// break and continue with locals and closures in the body
+let fns = [];
+for (i, x in [5, 6, 7, 8]) {
+    let doubled = x * 2;
+    fn get() { ret doubled; }
+    push(fns, get);
+    if (i == 1) continue;
+    if (i == 2) break;
+}
+print len(fns);
+print [fns[0](), fns[1](), fns[2]()];
+
+// find with an early ret
+fn index_of(arr, want) {
+    for (i, x in arr) {
+        if (x == want) ret i;
+    }
+    ret -1;
+}
+print index_of(["a", "b", "c"], "c");
+print index_of(["a"], "z");

@@ -1,0 +1,63 @@
+// Changing the collection during the loop.
+
+// arrays are walked live: pushes are visited, pops end the loop sooner
+let a = [1, 2, 3];
+let visited = [];
+for (x in a) {
+    push(visited, x);
+    if (x == 1) push(a, 4);
+    if (len(visited) > 10) break;
+}
+print visited;
+
+let b = [1, 2, 3, 4, 5];
+let seen = [];
+for (x in b) {
+    push(seen, x);
+    pop(b);
+}
+print seen;
+print b;
+
+// writing to the current index is fine
+let c = [1, 2, 3];
+for (i, x in c) c[i] = x * 10;
+print c;
+
+// maps: the keys present at the start, skipping ones removed since
+let m = { a: 1, b: 2, c: 3, d: 4 };
+let keys_seen = [];
+for (k in m) {
+    push(keys_seen, k);
+    if (k == "a") remove(m, "c");
+    if (k == "b") m.e = 5;              // added during the loop: not visited
+}
+print keys_seen;
+print m;
+
+// values are read when their key comes up
+let n = { a: 1, b: 2, c: 3 };
+for (k, v in n) {
+    print k + str(v);
+    if (k == "a") n.c = 30;
+}
+
+// a removed key that comes back before its turn is visited, with its new value
+let r = { a: 1, b: 2, c: 3 };
+for (k, v in r) {
+    print k + str(v);
+    if (k == "a") { remove(r, "b"); r.b = 20; }
+}
+
+// removing everything, which compacts the map mid-loop
+let big = {};
+for (let i = 0; i < 20; i = i + 1) big[i] = i;
+let count = 0;
+for (k in big) {
+    count = count + 1;
+    if (k == 0) {
+        for (let i = 1; i < 20; i = i + 1) remove(big, i);
+    }
+}
+print count;
+print len(big);

@@ -1,0 +1,6 @@
+before
+after
+50000
+100000
+-- stderr --
+-- exit 0 --
