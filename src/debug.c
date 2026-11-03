@@ -163,6 +163,8 @@ i32 disassemble_instruction(Chunk* chunk, i32 offset) {
         case OP_GET_INDEX:          return simple_instruction("OP_GET_INDEX", offset);
         case OP_SET_INDEX:          return simple_instruction("OP_SET_INDEX", offset);
         case OP_APPEND_ARRAY:       return byte_instruction("OP_APPEND_ARRAY", chunk, offset);
+        case OP_BUILD_MAP:          return byte_instruction("OP_BUILD_MAP", chunk, offset);
+        case OP_APPEND_MAP:         return byte_instruction("OP_APPEND_MAP", chunk, offset);
         case OP_WIDE:               return wide_instruction(chunk, offset);
         default:
             printf("Unknown opcode %d\n", instr);

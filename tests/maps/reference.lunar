@@ -1,0 +1,16 @@
+// Maps have reference semantics, like arrays.
+let a = { x: 1 };
+let b = a;
+b.x = 2;
+print a.x;
+print a == b;
+print a != { x: 2 };
+
+fn bump(m) { m.x = m.x + 1; }
+bump(a);
+print b.x;
+
+let list = [a, a];
+list[0].x = 100;
+print list[1].x;
+print { m: a }.m == a;

@@ -1,0 +1,4 @@
+-- stderr --
+Map key must be a string, number, or bool.
+[line 1] in script
+-- exit 100 --

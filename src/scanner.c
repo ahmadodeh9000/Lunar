@@ -146,6 +146,7 @@ Token scan_token() {
         case ')': return make_token(TOKEN_RIGHT_PAREN);
         case ';': return make_token(TOKEN_SEMICOLON);
         case ',': return make_token(TOKEN_COMMA);
+        case ':': return make_token(TOKEN_COLON);
         case '+': return make_token(TOKEN_PLUS);
         case '^': return make_token(TOKEN_BITWISE_XOR);
         case '~': return make_token(TOKEN_BITWISE_NOT);

@@ -1,0 +1,26 @@
+3
+true
+false
+[a, b, c]
+2
+nil
+{a: 1, c: 3}
+2
+[a, c, b]
+{a: 1, c: 3, b: 22}
+{}
+map: {x: [1, 2]}
+3
+{}
+0
+{again: true}
+nil
+nil
+nil
+nil
+nil
+nil
+nil
+1
+-- stderr --
+-- exit 0 --

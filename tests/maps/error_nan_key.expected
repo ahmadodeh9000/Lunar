@@ -1,0 +1,4 @@
+-- stderr --
+Map key can't be NaN.
+[line 2] in script
+-- exit 100 --

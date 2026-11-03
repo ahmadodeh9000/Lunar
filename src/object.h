@@ -27,6 +27,7 @@ typedef enum {
     OBJ_BOUND_METHOD,
     OBJ_FFI_LIB, 
     OBJ_FFI_FUNC , 
+    OBJ_MAP,
 } ObjType;
 
 struct Obj {
@@ -40,6 +41,22 @@ typedef struct {
     Obj obj;
     ValueArray items;
 } ObjArray;
+
+/*-- Map: an ordered hash, see map.c --*/
+typedef struct {
+    Value key;              // nil once the entry is removed
+    Value value;
+} MapEntry;
+
+typedef struct {
+    Obj obj;
+    MapEntry* entries;      // in insertion order, removed entries included
+    i32 count;              // entries used, removed ones included
+    i32 capacity;
+    i32 live;               // entries not removed
+    i32* index;             // hash slot -> position in entries, -1 if empty
+    i32 index_capacity;     // power of two, 0 while empty
+} ObjMap;
 
 /* ── String ── */
 struct ObjString {
@@ -156,6 +173,8 @@ static inline bool is_obj_type(Value value, ObjType type) {
 #define AS_FFI_FUNC(value)      ((ObjFFIFunc*)AS_OBJ(value))      // FFI
 #define IS_ARRAY(value)  is_obj_type(value, OBJ_ARRAY)            // ARRAY 
 #define AS_ARRAY(value)  ((ObjArray*)AS_OBJ(value))               // ARRAY
+#define IS_MAP(value)    is_obj_type(value, OBJ_MAP)              // MAP
+#define AS_MAP(value)    ((ObjMap*)AS_OBJ(value))                 // MAP
 
 
 ObjString*      copy_str(const char* chars, int length);
@@ -170,8 +189,11 @@ ObjBoundMethod* new_bound_method(Value receiver, ObjClosure* method);
 ObjFFILib* new_ffi_lib(ObjString* path, void* handle);      // FFI
 ObjFFIFunc* new_ffi_func(ObjString* name, void* symbol);    // FFI
 ObjArray* new_array();                                      // array
+ObjMap* new_map();                                          // map
 
 
 void printObject(Value value);
+bool print_enter(Obj* collection);   // false if it's already being printed (a cycle)
+void print_leave();
 
 #endif

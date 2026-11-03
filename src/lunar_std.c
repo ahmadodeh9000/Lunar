@@ -9,6 +9,7 @@
 #include "vm.h"
 #include "value.h"
 #include "object.h"
+#include "map.h"
 
 #include <time.h> // for CLOCKS_PER_SEC, don't remove it
 #include <stdio.h>
@@ -35,23 +36,39 @@ static void sb_append(StrBuf* sb, const char* s, int n) {
     sb->buf[sb->len] = '\0';
 }
 
-#define STR_MAX_DEPTH 16
-
-static void sb_value(StrBuf* sb, Value v, int depth) {
+// a collection inside itself is written as [...] or {...}, like print does
+static void sb_value(StrBuf* sb, Value v) {
     char tmp[64];
     if (IS_NUMBER(v))      { int n = snprintf(tmp, sizeof tmp, "%g", AS_NUMBER(v)); sb_append(sb, tmp, n); }
     else if (IS_BOOL(v))   { if (AS_BOOL(v)) sb_append(sb, "true", 4); else sb_append(sb, "false", 5); }
     else if (IS_NIL(v))    { sb_append(sb, "nil", 3); }
     else if (IS_STRING(v)) { sb_append(sb, AS_CSTRING(v), AS_STRING(v)->length); }
     else if (IS_ARRAY(v)) {
-        if (depth >= STR_MAX_DEPTH) { sb_append(sb, "[...]", 5); return; }
+        if (!print_enter(AS_OBJ(v))) { sb_append(sb, "[...]", 5); return; }
         ObjArray* a = AS_ARRAY(v);
         sb_append(sb, "[", 1);
         for (int i = 0; i < a->items.count; i++) {
             if (i > 0) sb_append(sb, ", ", 2);
-            sb_value(sb, a->items.values[i], depth + 1);
+            sb_value(sb, a->items.values[i]);
         }
         sb_append(sb, "]", 1);
+        print_leave();
+    }
+    else if (IS_MAP(v)) {
+        if (!print_enter(AS_OBJ(v))) { sb_append(sb, "{...}", 5); return; }
+        ObjMap* m = AS_MAP(v);
+        bool first = true;
+        sb_append(sb, "{", 1);
+        for (int i = 0; i < m->count; i++) {
+            if (IS_NIL(m->entries[i].key)) continue;   // removed
+            if (!first) sb_append(sb, ", ", 2);
+            first = false;
+            sb_value(sb, m->entries[i].key);
+            sb_append(sb, ": ", 2);
+            sb_value(sb, m->entries[i].value);
+        }
+        sb_append(sb, "}", 1);
+        print_leave();
     }
     else sb_append(sb, "<object>", 8);
 }
@@ -73,7 +90,33 @@ static Value len_native(int argc, Value* args) {
     if (argc != 1) return NIL_VAL;
     if (IS_STRING(args[0])) return NUMBER_VAL((double)AS_STRING(args[0])->length);
     if (IS_ARRAY(args[0]))  return NUMBER_VAL((double)AS_ARRAY(args[0])->items.count);
+    if (IS_MAP(args[0]))    return NUMBER_VAL((double)AS_MAP(args[0])->live);
     return NIL_VAL;
+}
+
+/* ── maps have no methods: these are plain functions ── */
+
+static Value has_native(int argc, Value* args) {
+    if (argc != 2 || !IS_MAP(args[0]) || map_key_error(args[1]) != NULL) return NIL_VAL;
+    Value v;
+    return BOOL_VAL(map_get(AS_MAP(args[0]), args[1], &v));
+}
+
+static Value keys_native(int argc, Value* args) {
+    if (argc != 1 || !IS_MAP(args[0])) return NIL_VAL;
+    ObjMap* m = AS_MAP(args[0]);
+    ObjArray* keys = new_array();           // can GC; the map is safe in args, on the stack
+    for (int i = 0; i < m->count; i++) {
+        if (!IS_NIL(m->entries[i].key)) write_value_array(&keys->items, m->entries[i].key);
+    }
+    return OBJ_VAL(keys);
+}
+
+static Value remove_native(int argc, Value* args) {
+    if (argc != 2 || !IS_MAP(args[0]) || map_key_error(args[1]) != NULL) return NIL_VAL;
+    Value v;
+    if (!map_remove(AS_MAP(args[0]), args[1], &v)) return NIL_VAL;
+    return v;                               // the removed value, like pop
 }
 
 
@@ -115,9 +158,9 @@ static Value str_native(int argc, Value* args) {
     if     (IS_NUMBER(args[0])) len=snprintf(buf,sizeof(buf),"%g",AS_NUMBER(args[0]));
     else if(IS_BOOL(args[0]))   len=snprintf(buf,sizeof(buf),"%s",AS_BOOL(args[0])?"true":"false");
     else if(IS_NIL(args[0]))    len=snprintf(buf,sizeof(buf),"nil");
-    else if (IS_ARRAY(args[0])) {
+    else if (IS_ARRAY(args[0]) || IS_MAP(args[0])) {
         StrBuf sb = {0};
-        sb_value(&sb, args[0], 0);
+        sb_value(&sb, args[0]);
         ObjString* s = copy_str(sb.buf, sb.len);
         free(sb.buf);
         return OBJ_VAL(s);
@@ -165,5 +208,8 @@ void register_std_natives() {
     define_native("random",random_native);
     define_native("push", push_native);
     define_native("pop",  pop_native);
+    define_native("has",    has_native);
+    define_native("keys",   keys_native);
+    define_native("remove", remove_native);
 }
 

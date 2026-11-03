@@ -1,0 +1,18 @@
+// Maps never have methods: m.anything is always a key, even a built-in's name.
+let m = { keys: "k", has: "h", len: "l", remove: "r", push: "p", str: "s" };
+print m.keys + m.has + m.len + m.remove + m.push + m.str;
+print keys(m);
+print len(m);
+print has(m, "keys");
+m.len = 42;
+print m.len;
+print len(m);
+print remove(m, "remove");
+print m.remove;
+print keys(m);
+
+// a function stored under a built-in's name is just a value
+fn double(x) { ret x * 2; }
+let tools = { keys: double };
+print tools.keys(21);
+print keys(tools);

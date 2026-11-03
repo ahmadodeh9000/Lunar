@@ -119,6 +119,23 @@ def big_array_literal():
     return "\n".join(out) + "\n"
 
 
+def big_map_literal():
+    out = ["// Map literals past 255 pairs are built in batches of 255, like arrays."]
+    for n in (255, 256, 511, 1000):
+        pairs = ", ".join(f"k{i}: {i}" for i in range(n))
+        out.append(f"let m{n} = {{{pairs}}};")
+        out.append(f"print [len(m{n}), m{n}.k0, m{n}.k{n - 1}, keys(m{n})[{n - 1}]];")
+    out.append("// order across batch boundaries, with a duplicate key in a later batch")
+    pairs = ", ".join(f"k{i}: {i}" for i in range(300)) + ", k3: \"late\""
+    out.append(f"let d = {{{pairs}}};")
+    out.append("let ks = keys(d);")
+    out.append("print [len(d), d.k3, ks[3], ks[254], ks[255], ks[256], ks[299]];")
+    big = ", ".join(f"{i}: \"v{i}\"" for i in range(5000))
+    out.append(f"let numbered = {{{big}}};")
+    out.append("print [len(numbered), numbered[0], numbered[4999], numbered[2500]];")
+    return "\n".join(out) + "\n"
+
+
 def write(name, text):
     with open(os.path.join(HERE, name), "w") as f:
         f.write(text)
@@ -126,3 +143,4 @@ def write(name, text):
 
 write("many_constants.lunar", many_constants())
 write("big_array_literal.lunar", big_array_literal())
+write("big_map_literal.lunar", big_map_literal())

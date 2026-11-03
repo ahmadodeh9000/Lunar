@@ -1,0 +1,36 @@
+// print and str() stop at cycles with [...] and {...}, and agree with each other.
+let a = [1, 2];
+push(a, a);
+print a;
+print str(a);
+
+let m = { name: "m" };
+m.me = m;
+print m;
+print str(m);
+
+let outer = { list: [] };
+push(outer.list, outer);
+print outer;
+print str(outer);
+
+let x = [];
+let y = { x: x };
+push(x, y);
+print x;
+print y;
+
+// the same collection twice, but not inside itself, prints in full
+let shared = [1];
+print [shared, shared];
+print { p: shared, q: shared };
+
+// deep nesting without a cycle prints in full (str used to stop at depth 16)
+let deep = [0];
+for (let i = 1; i < 20; i = i + 1) deep = [deep];
+print deep;
+print str(deep) == str(deep);
+print len(str(deep));
+let dm = { v: 0 };
+for (let i = 0; i < 18; i = i + 1) dm = { d: dm };
+print dm;

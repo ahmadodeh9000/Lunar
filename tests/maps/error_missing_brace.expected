@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at ';': Expect '}' after map entries.
+-- exit 110 --

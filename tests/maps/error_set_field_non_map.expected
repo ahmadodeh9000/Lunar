@@ -1,0 +1,4 @@
+-- stderr --
+Only instances and maps have fields.
+[line 2] in script
+-- exit 100 --

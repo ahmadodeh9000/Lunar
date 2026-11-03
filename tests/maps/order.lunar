@@ -1,0 +1,31 @@
+// Insertion order survives updates, removals, and compaction.
+let m = {};
+for (let i = 0; i < 10000; i = i + 1) m[i] = i * i;
+print len(m);
+for (let i = 0; i < 10000; i = i + 2) remove(m, i);       // remove the even keys
+print len(m);
+let ks = keys(m);
+print [ks[0], ks[1], ks[2], ks[len(ks) - 1]];
+let ok = true;
+for (let i = 0; i < len(ks); i = i + 1) {
+    if (ks[i] != 2 * i + 1) ok = false;
+    if (m[ks[i]] != ks[i] * ks[i]) ok = false;
+}
+print ok;
+for (let i = 0; i < 10000; i = i + 2) m[i] = "back";     // re-added at the end
+ks = keys(m);
+print [ks[0], ks[4999], ks[5000], ks[9999]];
+print len(m);
+m[1] = "updated";                                          // stays first
+print keys(m)[0];
+print m[1];
+
+// string keys, removed and re-added many times
+let s = {};
+for (let round = 0; round < 50; round = round + 1) {
+    for (let i = 0; i < 20; i = i + 1) s["k" + str(i)] = round;
+    for (let i = 0; i < 20; i = i + 2) remove(s, "k" + str(i));
+}
+print len(s);
+print keys(s);
+print s.k19;

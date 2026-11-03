@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at '1': Expect ':' after map key.
+-- exit 110 --

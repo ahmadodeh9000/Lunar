@@ -1,4 +1,4 @@
 -- stderr --
-Only instances have properties.
+Only instances and maps have properties.
 [line 2] in script
 -- exit 100 --

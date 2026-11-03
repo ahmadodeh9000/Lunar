@@ -150,6 +150,17 @@ ObjArray* new_array() {
     return array;
 }
 
+ObjMap* new_map() {
+    ObjMap* map         = ALLOCATE_OBJ(ObjMap, OBJ_MAP);
+    map->entries        = NULL;
+    map->count          = 0;
+    map->capacity       = 0;
+    map->live           = 0;
+    map->index          = NULL;
+    map->index_capacity = 0;
+    return map;
+}
+
 ObjFFILib* new_ffi_lib(ObjString* path, void* handle) {
     ObjFFILib* lib = ALLOCATE_OBJ(ObjFFILib, OBJ_FFI_LIB);
     lib->path = path;
@@ -167,6 +178,32 @@ ObjFFIFunc* new_ffi_func(ObjString* name, void* symbol) {
     func->rtype = NULL;
     func->lunar_return_type = 0;
     return func;
+}
+
+/* ── cycle check for printing: the arrays and maps currently being printed ── */
+static Obj** printing          = NULL;
+static int   printing_count    = 0;
+static int   printing_capacity = 0;
+
+bool print_enter(Obj* collection) {
+    for (int i = 0; i < printing_count; i++) {
+        if (printing[i] == collection) return false;
+    }
+    if (printing_count == printing_capacity) {
+        printing_capacity = printing_capacity < 8 ? 8 : 2 * printing_capacity;
+        printing = (Obj**)realloc(printing, sizeof(Obj*) * printing_capacity);
+        if (printing == NULL) { fprintf(stderr, "OOM print\n"); exit(1); }
+    }
+    printing[printing_count++] = collection;
+    return true;
+}
+
+void print_leave() {
+    if (--printing_count == 0) {
+        free(printing);
+        printing = NULL;
+        printing_capacity = 0;
+    }
 }
 
 static void print_function(ObjFunction* fn) {
@@ -215,12 +252,32 @@ void printObject(Value value) {
 
         case OBJ_ARRAY: {
             ObjArray* a = AS_ARRAY(value);
+            if (!print_enter(AS_OBJ(value))) { printf("[...]"); break; }
             printf("[");
             for (int i = 0; i < a->items.count; i++) {
                 if (i > 0) printf(", ");
                 printValue(a->items.values[i]);
             }
             printf("]");
+            print_leave();
+            break;
+        }
+
+        case OBJ_MAP: {
+            ObjMap* m = AS_MAP(value);
+            if (!print_enter(AS_OBJ(value))) { printf("{...}"); break; }
+            printf("{");
+            bool first = true;
+            for (int i = 0; i < m->count; i++) {
+                if (IS_NIL(m->entries[i].key)) continue;   // removed
+                if (!first) printf(", ");
+                first = false;
+                printValue(m->entries[i].key);
+                printf(": ");
+                printValue(m->entries[i].value);
+            }
+            printf("}");
+            print_leave();
             break;
         }
 

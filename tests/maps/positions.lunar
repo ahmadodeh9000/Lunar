@@ -1,0 +1,27 @@
+// A { that starts a statement is a block; anywhere an expression goes, it is a map.
+fn show(m) { print m; }
+show({ a: 1 });
+show({});
+
+fn make(n) { ret { n: n, double: n * 2 }; }
+print make(4);
+
+fn empty() { ret {}; }
+print empty();
+
+print [{ a: 1 }, {}, { b: [] }];
+print ({ x: 1 }).x;
+let picked = { left: "L", right: "R" }["right"];
+print picked;
+
+struct Holder { init() { self.data = { ready: true }; } }
+print Holder().data.ready;
+
+// a block at the start of a statement is still a block
+{
+    let inside = "block";
+    print inside;
+}
+if (true) { print "if block"; }
+while (false) { }
+print "done";

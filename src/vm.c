@@ -5,6 +5,7 @@
 #include "memory.h"
 #include "table.h"
 #include "lunar_ffi.h"
+#include "map.h"
 
 #ifdef LUNAR_SDL
 #include "lunar_sdl.h"
@@ -201,6 +202,16 @@ static bool bind_method(ObjStruct* klass, ObjString* name) {
     pop(); push(OBJ_VAL(bm)); return true;
 }
 
+// adds n key/value pairs (key, value, key, value, ...) that stay on the stack meanwhile
+static bool add_map_pairs(ObjMap* map, Value* pairs, int n) {
+    for (int i = 0; i < n; i++) {
+        const char* err = map_key_error(pairs[2*i]);
+        if (err != NULL) { runtime_error("%s", err); return false; }
+        map_set(map, pairs[2*i], pairs[2*i+1]);
+    }
+    return true;
+}
+
 static bool invoke_from_class(ObjStruct* klass, ObjString* name, int argc) {
     Value method;
     if(!table_get(klass->methods,name,&method)){ runtime_error("Undefined property '%s'.",name->chars); return false; }
@@ -209,7 +220,14 @@ static bool invoke_from_class(ObjStruct* klass, ObjString* name, int argc) {
 
 static bool invoke(ObjString* name, int argc) {
     Value receiver=peek(argc);
-    if(!IS_INSTANCE(receiver)){ runtime_error("Only instances have methods."); return false; }
+    if(!IS_INSTANCE(receiver)){
+        if(IS_MAP(receiver)){
+            // maps have no methods: m.f(x) calls the function stored at "f", with no self
+            Value val; if(!map_get(AS_MAP(receiver),OBJ_VAL(name),&val)) val=NIL_VAL;
+            lvm.stack_top[-argc-1]=val; return call_value(val,argc);
+        }
+        runtime_error("Only instances and maps have methods."); return false;
+    }
     ObjInstance* inst=AS_INSTANCE(receiver);
     Value val;
     if(table_get(inst->fields,name,&val)){ lvm.stack_top[-argc-1]=val; return call_value(val,argc); }
@@ -332,9 +350,37 @@ static InterpretResult run() {
                 break;
             }
 
+            case OP_BUILD_MAP: {
+                int n = READ_BYTE();
+                ObjMap* map = new_map();
+                push(OBJ_VAL(map));                   // root it: map_set can trigger GC
+                if (!add_map_pairs(map, lvm.stack_top - 1 - 2*n, n)) return INTERPRET_RUNTIME_ERR;
+                Value result = pop();                 // the map
+                lvm.stack_top -= 2*n;                 // drop the pairs
+                push(result);
+                break;
+            }
+
+            case OP_APPEND_MAP: {
+                int n = READ_BYTE();
+                ObjMap* map = AS_MAP(peek(2*n));
+                if (!add_map_pairs(map, lvm.stack_top - 2*n, n)) return INTERPRET_RUNTIME_ERR;
+                lvm.stack_top -= 2*n;                 // drop the pairs, keep the map
+                break;
+            }
+
             case OP_GET_INDEX: {
                 if (!IS_ARRAY(peek(1))) {
-                    runtime_error("Only arrays can be indexed.");
+                    if (IS_MAP(peek(1))) {
+                        const char* err = map_key_error(peek(0));
+                        if (err != NULL) { runtime_error("%s", err); return INTERPRET_RUNTIME_ERR; }
+                        Value v;
+                        if (!map_get(AS_MAP(peek(1)), peek(0), &v)) v = NIL_VAL;   // missing key
+                        pop(); pop();
+                        push(v);
+                        break;
+                    }
+                    runtime_error("Only arrays and maps can be indexed.");
                     return INTERPRET_RUNTIME_ERR;
                 }
                 if (!IS_NUMBER(peek(0))) {
@@ -355,7 +401,16 @@ static InterpretResult run() {
             
             case OP_SET_INDEX: {
                 if (!IS_ARRAY(peek(2))) {
-                    runtime_error("Only arrays can be indexed.");
+                    if (IS_MAP(peek(2))) {
+                        const char* err = map_key_error(peek(1));
+                        if (err != NULL) { runtime_error("%s", err); return INTERPRET_RUNTIME_ERR; }
+                        map_set(AS_MAP(peek(2)), peek(1), peek(0));   // all three still on the stack
+                        Value v = pop();
+                        pop(); pop();
+                        push(v);                      // assignment is an expression
+                        break;
+                    }
+                    runtime_error("Only arrays and maps can be indexed.");
                     return INTERPRET_RUNTIME_ERR;
                 }
                 if (!IS_NUMBER(peek(1))) {
@@ -389,7 +444,13 @@ static InterpretResult run() {
             }
             case OP_STRUCT: k=READ_CONST(); op_struct: push(OBJ_VAL(new_struct(AS_STRING(k)))); break;
             case OP_GET_PROPERTY: k=READ_CONST(); op_get_property: {
-                if(!IS_INSTANCE(peek(0))){ runtime_error("Only instances have properties."); return INTERPRET_RUNTIME_ERR; }
+                if(!IS_INSTANCE(peek(0))){
+                    if(IS_MAP(peek(0))){    // m.key is m["key"]; a missing key is nil
+                        Value val; if(!map_get(AS_MAP(peek(0)),k,&val)) val=NIL_VAL;
+                        pop(); push(val); break;
+                    }
+                    runtime_error("Only instances and maps have properties."); return INTERPRET_RUNTIME_ERR;
+                }
                 ObjInstance* inst=AS_INSTANCE(peek(0)); ObjString* name=AS_STRING(k);
                 Value val;
                 if(table_get(inst->fields,name,&val)){ pop(); push(val); break; }
@@ -397,7 +458,13 @@ static InterpretResult run() {
                 break;
             }
             case OP_SET_PROPERTY: k=READ_CONST(); op_set_property: {
-                if(!IS_INSTANCE(peek(1))){ runtime_error("Only instances have fields."); return INTERPRET_RUNTIME_ERR; }
+                if(!IS_INSTANCE(peek(1))){
+                    if(IS_MAP(peek(1))){    // m.key = v is m["key"] = v
+                        map_set(AS_MAP(peek(1)),k,peek(0));
+                        Value val=pop(); pop(); push(val); break;
+                    }
+                    runtime_error("Only instances and maps have fields."); return INTERPRET_RUNTIME_ERR;
+                }
                 ObjInstance* inst=AS_INSTANCE(peek(1)); ObjString* name=AS_STRING(k);
                 table_set(inst->fields,name,peek(0));
                 Value val=pop(); pop(); push(val); break;

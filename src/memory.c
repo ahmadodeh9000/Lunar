@@ -172,6 +172,15 @@ static void blacken_object(Obj* object) {
             break;
         }
 
+        case OBJ_MAP: {
+            ObjMap* map = (ObjMap*)object;
+            for (int i = 0; i < map->count; i++) {
+                mark_value(map->entries[i].key);
+                mark_value(map->entries[i].value);
+            }
+            break;
+        }
+
         case OBJ_NATIVE:
         case OBJ_STRING:
             break; // no outgoing references
@@ -301,6 +310,14 @@ void freeObject(Obj* object) {
             ObjArray* array = (ObjArray*)object;
             free_value_array(&array->items);
             FREE(ObjArray, object);
+            break;
+        }
+
+        case OBJ_MAP: {
+            ObjMap* map = (ObjMap*)object;
+            FREE_ARRAY(MapEntry, map->entries, map->capacity);
+            FREE_ARRAY(i32, map->index, map->index_capacity);
+            FREE(ObjMap, object);
             break;
         }
 

@@ -1,0 +1,19 @@
+10
+10
+nil
+nil
+{hp: 10, mp: 3, xp: 0}
+7
+{hp: 7, mp: 3, xp: 0, b: 1, a: 1}
+{hp: 99, mp: 3, xp: 0, b: 1, a: 1}
+true
+6
+nil
+{inner: {deep: 2, other: 3}}
+5
+100
+threet
+[{id: 1}, {id: 20}]
+{items: [sword]}
+-- stderr --
+-- exit 0 --

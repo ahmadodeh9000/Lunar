@@ -1,0 +1,37 @@
+// has, keys, remove, len, str on maps.
+let m = { a: 1, b: 2, c: 3 };
+print len(m);
+print has(m, "a");
+print has(m, "z");
+print keys(m);
+print remove(m, "b");                    // the removed value
+print remove(m, "b");                    // nil once it's gone
+print m;
+print len(m);
+m.b = 22;                                // re-adding goes to the end
+print keys(m);
+print str(m);
+print str({});
+print "map: " + str({ x: [1, 2] });
+
+// keys() is a new array each time
+let ks = keys(m);
+push(ks, "extra");
+print len(keys(m));
+
+// remove everything, then reuse
+remove(m, "a"); remove(m, "c"); remove(m, "b");
+print m;
+print len(m);
+m.again = true;
+print m;
+
+// bad arguments give nil, like the other built-ins (until M5)
+print has(1, "a");
+print has(m, nil);
+print has(m);
+print keys([1]);
+print keys();
+print remove(m, [1]);
+print remove("x", "y");
+print len({ a: nil });

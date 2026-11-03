@@ -1,0 +1,17 @@
+{}
+{name: Rex, hp: 10}
+{hp: 10, mp: 5}
+false
+{dynamic: 1, ab: 2}
+{1: one, 2.5: two and a half, -3: minus three}
+{true: yes, false: no}
+{a: 3, b: 2}
+{a: 1, b: 2}
+{x: {y: {z: [1, 2, {w: true}]}}}
+int
+zero
+number string
+2
+{v: 5, w: 10}
+-- stderr --
+-- exit 0 --

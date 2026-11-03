@@ -1,0 +1,23 @@
+// Maps that hold the only reference to their keys and values, under heavy allocation.
+// Run by `make test` under the GC stress build too, which collects on every allocation.
+fn build(n) {
+    let m = {};
+    for (let i = 0; i < n; i = i + 1) {
+        m["key" + str(i)] = { value: "v" + str(i), list: [str(i), str(i * 2)] };
+    }
+    ret m;
+}
+let total = 0;
+for (let round = 0; round < 20; round = round + 1) {
+    let m = build(30);
+    for (let i = 0; i < 30; i = i + 3) remove(m, "key" + str(i));
+    let ks = keys(m);
+    for (let i = 0; i < len(ks); i = i + 1) {
+        total = total + len(m[ks[i]].value) + len(m[ks[i]].list[1]);
+    }
+}
+print total;
+let keep = build(50);
+print keep.key49.value;
+print keep["key7"].list;
+print len(keep);

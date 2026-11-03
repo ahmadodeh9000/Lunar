@@ -1,0 +1,13 @@
+khlrps
+[keys, has, len, remove, push, str]
+6
+true
+42
+6
+r
+nil
+[keys, has, len, push, str]
+42
+[keys]
+-- stderr --
+-- exit 0 --

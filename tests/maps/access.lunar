@@ -1,0 +1,40 @@
+// Reading and writing with [] and with the . sugar.
+let m = { hp: 10 };
+print m["hp"];
+print m.hp;
+print m["missing"];                      // a missing key is nil
+print m.missing;
+m["mp"] = 3;
+m.xp = 0;
+print m;
+print m["hp"] = 7;                       // assignment is an expression
+m.a = m.b = 1;
+print m;
+m.hp = 99;                               // an update keeps the key's position
+print m;
+m.gone = nil;                            // nil is a value, not a delete
+print has(m, "gone");
+print len(m);
+print m.gone;
+
+let nested = { inner: { deep: 1 } };
+nested.inner.deep = 2;
+nested["inner"]["other"] = 3;
+print nested;
+print nested.inner["deep"] + nested["inner"].other;
+
+let k = "hp";
+m[k] = m[k] + 1;
+print m[k];
+let grid = {};
+grid[3] = "three";
+grid[true] = "t";
+print grid[3] + grid[true];
+
+// maps in arrays and arrays in maps
+let list = [{ id: 1 }, { id: 2 }];
+list[1].id = 20;
+print list;
+let bag = { items: [] };
+push(bag.items, "sword");
+print bag;

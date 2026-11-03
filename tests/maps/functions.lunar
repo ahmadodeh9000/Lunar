@@ -1,0 +1,42 @@
+// m.f(x) calls the function stored in the map, with no self binding.
+fn add(a, b) { ret a + b; }
+let math = { add: add, twice: nil };
+print math.add(2, 3);
+print math["add"](4, 5);
+let f = math.add;
+print f(1, 1);
+
+// the function gets exactly the arguments passed: no hidden map argument
+fn count_args(a, b) { ret [a, b]; }
+let m = { f: count_args };
+print m.f(1, 2);
+
+// closures in a map share state, the module pattern
+fn make_counter() {
+    let n = 0;
+    fn inc() { n = n + 1; ret n; }
+    fn get() { ret n; }
+    ret { inc: inc, get: get };
+}
+let c = make_counter();
+c.inc(); c.inc();
+print c.get();
+
+// a function in a struct field behaves the same way: called without self
+struct Box {
+    init() { self.label = "box"; }
+    describe() { ret "I am " + self.label; }
+}
+let b = Box();
+b.field_fn = add;
+print b.field_fn(10, 20);
+print b.describe();                      // a method still gets self
+
+// a bound method stored in a map keeps its own receiver
+let holder = { say: b.describe };
+print holder.say();
+
+// a function stored into an existing key
+fn fn_twice(x) { ret x * 2; }
+math.twice = fn_twice;
+print math.twice(8);

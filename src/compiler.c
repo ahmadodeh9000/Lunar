@@ -576,6 +576,33 @@ static void array_literal(bool can_assign) {
     else if (count > 0)  emit_bytes(OP_APPEND_ARRAY, (u8)count);
 }
 
+// { key: value, ... }, built in batches of 255 pairs like array literals.
+// A bare identifier key is a string ({ hp: 10 } is { "hp": 10 }); any other key
+// is an expression, so a variable's value is used with parentheses: { (name): 1 }.
+static void map_literal(bool can_assign) {
+    int  count = 0;
+    bool built = false;
+    if (!check(TOKEN_RIGHT_BRACE)) {
+        do {
+            if (check(TOKEN_RIGHT_BRACE)) break;     // trailing comma, like arrays
+            if (match(TOKEN_IDENTIFIER)) {
+                emit_const(OBJ_VAL(copy_str(parser.prev.start, parser.prev.length)));
+            } else {
+                expression();
+            }
+            consume(TOKEN_COLON, "Expect ':' after map key.");
+            expression();
+            if (++count == UINT8_MAX) {
+                emit_bytes(built ? OP_APPEND_MAP : OP_BUILD_MAP, (u8)count);
+                built = true;
+                count = 0;
+            }
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after map entries.");
+    if (!built)          emit_bytes(OP_BUILD_MAP, (u8)count);
+    else if (count > 0)  emit_bytes(OP_APPEND_MAP, (u8)count);
+}
 
 static void subscript(bool can_assign) {
     expression();
@@ -673,7 +700,7 @@ static void super_(bool can_assign) {
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN]          = {grouping,  call_,   PREC_CALL},
     [TOKEN_RIGHT_PAREN]         = {NULL,       NULL,    PREC_NONE},
-    [TOKEN_LEFT_BRACE]          = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_LEFT_BRACE]          = {map_literal, NULL,   PREC_NONE},
     [TOKEN_RIGHT_BRACE]         = {NULL,       NULL,    PREC_NONE},
     [TOKEN_DOT]                 = {NULL,       dot,     PREC_CALL},
     [TOKEN_MINUS]               = {unary,      binary,  PREC_TERM},
@@ -699,6 +726,7 @@ ParseRule rules[] = {
     [TOKEN_LESS_EQUAL]          = {NULL,       binary,  PREC_COMPARISON},
     [TOKEN_LEFT_BRACKET]        = {array_literal, subscript, PREC_CALL},
     [TOKEN_RIGHT_BRACKET]       = {NULL,          NULL,      PREC_NONE},
+    [TOKEN_COLON]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_IDENTIFIER]          = {variable,   NULL,    PREC_NONE},
     [TOKEN_STRING]              = {string_,    NULL,    PREC_NONE},
     [TOKEN_NUMBER]              = {number,     NULL,    PREC_NONE},
