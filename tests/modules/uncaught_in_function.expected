@@ -1,0 +1,7 @@
+calling
+-- stderr --
+Array index 10 out of bounds (length 2).
+[lib/errfn.lunar line 3] in helper()
+[lib/errfn.lunar line 5] in boom()
+[line 4] in script
+-- exit 100 --

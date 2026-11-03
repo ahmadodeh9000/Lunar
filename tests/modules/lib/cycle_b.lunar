@@ -1,0 +1,2 @@
+import("cycle_a.lunar");
+ret 2;

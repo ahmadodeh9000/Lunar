@@ -1,0 +1,13 @@
+// 2D vectors as maps: { x: 1, y: 2 }.
+let util = import("util.lunar");
+
+fn add(a, b)   { ret { x: a.x + b.x, y: a.y + b.y }; }
+fn scale(v, k) { ret { x: v.x * k, y: v.y * k }; }
+fn length(v)   { ret sqrt(v.x * v.x + v.y * v.y); }
+
+// keeps a position inside a width x height area
+fn clamp(v, width, height) {
+    ret { x: util.clamp(v.x, 0, width), y: util.clamp(v.y, 0, height) };
+}
+
+ret { add: add, scale: scale, length: length, clamp: clamp };

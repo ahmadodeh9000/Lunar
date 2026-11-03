@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE     // realpath, strdup, getcwd under -std=c11 with glibc
 #include "vm.h"
 #include "debug.h"
 #include "compiler.h"
@@ -19,6 +20,9 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 LunarVM lvm;
 
@@ -40,7 +44,7 @@ static bool            invoke_from_class(ObjStruct* klass, ObjString* name, int 
 void define_native(const char* name, NativeFn fn) {
     push(OBJ_VAL(copy_str(name,(int)strlen(name))));
     push(OBJ_VAL(new_native(fn,name)));
-    table_set(&lvm.globals, AS_STRING(lvm.stack[0]), lvm.stack[1]);
+    table_set(&lvm.builtins, AS_STRING(lvm.stack[0]), lvm.stack[1]);
     pop(); pop();
 }
 
@@ -49,8 +53,10 @@ void init_lunar_vm() {
     lvm.objects=NULL; lvm.bytes_allocated=0; lvm.next_gc=1024*1024;
     lvm.gray_count=0; lvm.gray_capacity=0; lvm.gray_stack=NULL;
     lvm.open_upvalues=NULL;
-    init_table(&lvm.globals);
+    init_table(&lvm.builtins);
+    init_table(&lvm.modules);
     init_table(&lvm.strings);
+    lvm.main_module=NULL; lvm.main_dir=NULL;
     lvm.init_string=NULL;
     lvm.init_string=copy_str("init",4);
 
@@ -59,13 +65,13 @@ void init_lunar_vm() {
     ObjNative* ffiLoadNative = new_native(ffi_load_library, "clib");
     push(OBJ_VAL(ffiLoadNative)); // Push to stack to protect from a sudden GC sweep
     push(OBJ_VAL(copy_str("clib", 4)));   // root the name too: table_set can trigger GC
-    table_set(&lvm.globals, AS_STRING(lvm.stack_top[-1]), lvm.stack_top[-2]);
+    table_set(&lvm.builtins, AS_STRING(lvm.stack_top[-1]), lvm.stack_top[-2]);
     pop(); pop();
 
     ObjNative* ffiBindNative = new_native(ffi_bind_function, "cbind");
     push(OBJ_VAL(ffiBindNative));
     push(OBJ_VAL(copy_str("cbind", 5)));
-    table_set(&lvm.globals, AS_STRING(lvm.stack_top[-1]), lvm.stack_top[-2]);
+    table_set(&lvm.builtins, AS_STRING(lvm.stack_top[-1]), lvm.stack_top[-2]);
     pop(); pop();
 
 #ifdef LUNAR_SDL
@@ -74,8 +80,10 @@ void init_lunar_vm() {
 }
 
 void free_lunar_vm() {
-    free_table(&lvm.globals);
+    free_table(&lvm.builtins);
+    free_table(&lvm.modules);
     free_table(&lvm.strings);
+    free(lvm.main_dir); lvm.main_dir=NULL; lvm.main_module=NULL;
     lvm.init_string=NULL;
     freeObjects();
 }
@@ -83,6 +91,7 @@ void free_lunar_vm() {
 static void reset_stack() {
     lvm.stack_top=lvm.stack; lvm.frame_count=0; lvm.open_upvalues=NULL;
     lvm.handler_count=0; lvm.error_pending=false; lvm.error_value=NIL_VAL;
+    lvm.loading_count=0;
 }
 
 void push(Value val) {
@@ -111,9 +120,20 @@ static void report_uncaught(Value err) {
     for(int i=lvm.frame_count-1;i>=0;i--){
         CallFrame* f=&lvm.frames[i]; ObjFunction* fn=f->closure->function;
         size_t instr=f->ip-fn->chunk.code-1;
-        fprintf(stderr,"[line %d] in ",fn->chunk.lines[instr]);
-        if(fn->name==NULL) fprintf(stderr,"script\n");
+        bool imported=fn->module!=lvm.main_module;      // the main script's lines look as they always did
+        if(imported) fprintf(stderr,"[%s line %d] in ",fn->module->name->chars,fn->chunk.lines[instr]);
+        else         fprintf(stderr,"[line %d] in ",fn->chunk.lines[instr]);
+        if(fn->name==NULL) fprintf(stderr,imported?"module\n":"script\n");
         else               fprintf(stderr,"%s()\n",fn->name->chars);
+    }
+}
+
+// Modules whose top-level frame is gone (an error unwound past it) never finished
+// loading: they leave the cache, so importing them again runs them again.
+static void abandon_loading(int frames_left) {
+    while(lvm.loading_count>0 && lvm.loading[lvm.loading_count-1].frame>=frames_left){
+        ObjModule* m=lvm.loading[--lvm.loading_count].module;
+        table_delete(&lvm.modules,m->file);
     }
 }
 
@@ -122,8 +142,9 @@ static void report_uncaught(Value err) {
 // reported and the VM reset; returns false then.
 static bool catch_error() {
     Value err=lvm.error_value;
-    if(lvm.handler_count==0){ report_uncaught(err); reset_stack(); return false; }
+    if(lvm.handler_count==0){ report_uncaught(err); abandon_loading(0); reset_stack(); return false; }
     Handler* h=&lvm.handlers[--lvm.handler_count];
+    abandon_loading(h->frame_count);
     lvm.frame_count=h->frame_count;
     close_upvalues(h->stack_top);
     lvm.stack_top=h->stack_top;
@@ -307,8 +328,160 @@ static InterpretResult run_catching() {
     }
 }
 
-InterpretResult interpret(const char* src) {
-    ObjFunction* fn=compile(src);
+/* ── modules ── */
+
+// The name shown for a module: its path relative to the main script's directory,
+// or the full path when it's somewhere else.
+static ObjString* module_name(const char* canonical) {
+    size_t dir=strlen(lvm.main_dir);
+    if(strncmp(canonical,lvm.main_dir,dir)==0 && canonical[dir]=='/') canonical+=dir+1;
+    return copy_str(canonical,(int)strlen(canonical));
+}
+
+// a new module whose globals start as the built-ins; it's left pushed on the stack
+static ObjModule* push_new_module(ObjString* file, ObjString* name) {
+    ObjModule* module=new_module(file,name);
+    push(OBJ_VAL(module));
+    table_add_all(&lvm.builtins,&module->globals);     // can GC; the module is on the stack
+    return module;
+}
+
+// reads a whole file into a malloc'd, NUL-terminated buffer, or NULL
+static char* read_source(const char* path) {
+    struct stat st;
+    if(stat(path,&st)!=0 || !S_ISREG(st.st_mode)) return NULL;
+    FILE* f=fopen(path,"rb");
+    if(f==NULL) return NULL;
+    char* buf=(char*)malloc((size_t)st.st_size+1);
+    if(buf==NULL){ fclose(f); return NULL; }
+    size_t n=fread(buf,1,(size_t)st.st_size,f);
+    buf[n]='\0';
+    fclose(f);
+    return buf;
+}
+
+// The "Circular import: a -> b -> a." message: the modules still loading, from the
+// one being imported again to the newest, then that one again. The main script is
+// always loading and isn't on the loading stack: it heads the chain.
+static void circular_import_error(ObjModule* again) {
+    int from=0;
+    while(from<lvm.loading_count && lvm.loading[from].module!=again) from++;
+    bool main_first=from==lvm.loading_count;
+    if(main_first) from=0;
+    size_t len=32+lvm.main_module->name->length;
+    for(int i=from;i<lvm.loading_count;i++) len+=lvm.loading[i].module->name->length+4;
+    len+=again->name->length;
+    char* msg=(char*)malloc(len);
+    if(msg==NULL){ fprintf(stderr,"OOM import\n"); exit(1); }
+    strcpy(msg,"Circular import: ");
+    if(main_first){ strcat(msg,lvm.main_module->name->chars); strcat(msg," -> "); }
+    for(int i=from;i<lvm.loading_count;i++){ strcat(msg,lvm.loading[i].module->name->chars); strcat(msg," -> "); }
+    strcat(msg,again->name->chars);
+    runtime_error("%s.",msg);
+    free(msg);
+}
+
+// import(path): the path is on top of the stack. A module already loaded gives its
+// exports at once; otherwise its file is compiled and its top-level code is called in
+// a new frame, whose OP_MODULE_RET caches the exports and hands them back.
+static bool import_module(ObjModule* importer) {
+    if(!IS_STRING(peek(0))){
+        runtime_error("import() expects a string path (got %s).",value_type_name(peek(0)));
+        return false;
+    }
+    ObjString* path=AS_STRING(peek(0));
+    size_t plen=(size_t)path->length;
+    bool is_file=strchr(path->chars,'/')!=NULL || (plen>=6 && strcmp(path->chars+plen-6,".lunar")==0);
+    if(!is_file){       // room for built-in modules such as import("string"); none exist yet
+        runtime_error("No built-in module named '%s' (to import a file, use '%s.lunar').",path->chars,path->chars);
+        return false;
+    }
+
+    // relative to the importing file's directory (the current one for the REPL)
+    char cwd[PATH_MAX];
+    const char* dir;
+    size_t dlen;
+    if(importer->file!=NULL){
+        dir=importer->file->chars;
+        dlen=(size_t)(strrchr(dir,'/')-dir);
+    } else {
+        if(getcwd(cwd,sizeof cwd)==NULL) strcpy(cwd,".");
+        dir=cwd; dlen=strlen(cwd);
+    }
+    char* joined=(char*)malloc(dlen+plen+2);
+    if(joined==NULL){ fprintf(stderr,"OOM import\n"); exit(1); }
+    if(path->chars[0]=='/') strcpy(joined,path->chars);
+    else { memcpy(joined,dir,dlen); joined[dlen]='/'; strcpy(joined+dlen+1,path->chars); }
+
+    char canonical[PATH_MAX];
+    if(realpath(joined,canonical)==NULL){
+        runtime_error("Can't find module '%s' (looked for %s).",path->chars,joined);
+        free(joined);
+        return false;
+    }
+    free(joined);
+
+    Value* path_slot=lvm.stack_top-1;
+    ObjString* file=copy_str(canonical,(int)strlen(canonical));
+    push(OBJ_VAL(file));
+    Value cached;
+    if(table_get(&lvm.modules,file,&cached)){
+        ObjModule* m=AS_MODULE(cached);
+        if(!m->loaded){ circular_import_error(m); return false; }
+        lvm.stack_top=path_slot;
+        push(m->exports);
+        return true;
+    }
+
+    char* src=read_source(canonical);
+    if(src==NULL){ runtime_error("Can't read module '%s'.",path->chars); return false; }
+
+    ObjString* name=module_name(canonical);
+    push(OBJ_VAL(name));
+    ObjModule* module=push_new_module(file,name);
+    table_set(&lvm.modules,file,OBJ_VAL(module));       // marks it as loading, for cycles
+    ObjFunction* fn=compile(src,module);
+    free(src);
+    if(fn==NULL){
+        table_delete(&lvm.modules,file);
+        runtime_error("Can't compile module '%s'.",name->chars);
+        return false;
+    }
+    push(OBJ_VAL(fn));
+    ObjClosure* closure=new_closure(fn);
+    lvm.stack_top=path_slot;                            // the frame's slot 0 replaces the path
+    push(OBJ_VAL(closure));
+    if(!call(closure,0)){ table_delete(&lvm.modules,file); return false; }
+    lvm.loading[lvm.loading_count].module=module;
+    lvm.loading[lvm.loading_count].frame=lvm.frame_count-1;
+    lvm.loading_count++;
+    return true;
+}
+
+// the module for the main script (or the REPL), made on the first interpret()
+static void make_main_module(const char* path) {
+    char canonical[PATH_MAX];
+    ObjString* file=NULL;
+    if(path!=NULL && realpath(path,canonical)!=NULL){
+        lvm.main_dir=strdup(canonical);
+        *strrchr(lvm.main_dir,'/')='\0';
+        file=copy_str(canonical,(int)strlen(canonical));
+    } else {
+        if(getcwd(canonical,sizeof canonical)==NULL) strcpy(canonical,".");
+        lvm.main_dir=strdup(canonical);
+    }
+    push(file!=NULL?OBJ_VAL(file):NIL_VAL);
+    ObjString* name=file!=NULL?module_name(file->chars):copy_str("<repl>",6);
+    push(OBJ_VAL(name));
+    ObjModule* module=push_new_module(file,name);
+    lvm.main_module=module;         // never marked loaded: importing the main script is a cycle
+    if(file!=NULL) table_set(&lvm.modules,file,OBJ_VAL(module));
+    lvm.stack_top-=3;
+}
+
+InterpretResult interpret(const char* src, const char* path) {
+    if(lvm.main_module==NULL) make_main_module(path);
+    ObjFunction* fn=compile(src,lvm.main_module);
     if(fn==NULL) return INTERPRET_COMPILE_ERR;
     push(OBJ_VAL(fn));
     ObjClosure* closure=new_closure(fn);
@@ -318,7 +491,13 @@ InterpretResult interpret(const char* src) {
 }
 
 static InterpretResult run() {
-    CallFrame* frame=&lvm.frames[lvm.frame_count-1];
+    CallFrame* frame;
+    Table* globals;     // the current function's module globals
+
+// after any change of frame: the newest frame, and its module's globals
+#define LOAD_FRAME() (frame=&lvm.frames[lvm.frame_count-1], \
+                      globals=&frame->closure->function->module->globals)
+    LOAD_FRAME();
 
 #define READ_BYTE()   (*frame->ip++)
 #define READ_SHORT()  (frame->ip+=2,(u16)((frame->ip[-2]<<8)|frame->ip[-1]))
@@ -350,15 +529,15 @@ static InterpretResult run() {
             case OP_POP:     pop(); break;
             case OP_GET_LOCAL:  push(frame->slots[READ_BYTE()]); break;
             case OP_SET_LOCAL:  frame->slots[READ_BYTE()]=peek(0); break;
-            case OP_DEFINE_GLOBAL: k=READ_CONST(); op_define_global: { ObjString* n=AS_STRING(k); table_set(&lvm.globals,n,peek(0)); pop(); break; }
+            case OP_DEFINE_GLOBAL: k=READ_CONST(); op_define_global: { ObjString* n=AS_STRING(k); table_set(globals,n,peek(0)); pop(); break; }
             case OP_GET_GLOBAL: k=READ_CONST(); op_get_global: {
                 ObjString* n=AS_STRING(k); Value v;
-                if(!table_get(&lvm.globals,n,&v)){ runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
+                if(!table_get(globals,n,&v)){ runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
                 push(v); break;
             }
             case OP_SET_GLOBAL: k=READ_CONST(); op_set_global: {
                 ObjString* n=AS_STRING(k);
-                if(table_set(&lvm.globals,n,peek(0))){ table_delete(&lvm.globals,n); runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
+                if(table_set(globals,n,peek(0))){ table_delete(globals,n); runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
                 break;
             }
             case OP_GET_UPVALUE: push(*frame->closure->upvalues[READ_BYTE()]->location); break;
@@ -579,15 +758,29 @@ static InterpretResult run() {
             case OP_CALL: {
                 int argc=READ_BYTE();
                 if(!call_value(peek(argc),argc)) return INTERPRET_RUNTIME_ERR;
-                frame=&lvm.frames[lvm.frame_count-1]; break;
+                LOAD_FRAME(); break;
             }
             case OP_RET: {
                 Value result=pop(); close_upvalues(frame->slots);
                 lvm.frame_count--;
                 if(lvm.frame_count==0){ pop(); return INTERPRET_OK; }
                 lvm.stack_top=frame->slots; push(result);
-                frame=&lvm.frames[lvm.frame_count-1]; break;
+                LOAD_FRAME(); break;
             }
+            // the end of a file's top-level code: the end of the script, or of an import
+            case OP_MODULE_RET: {
+                Value result=pop(); close_upvalues(frame->slots);
+                lvm.frame_count--;
+                if(lvm.frame_count==0){ pop(); return INTERPRET_OK; }
+                ObjModule* m=frame->closure->function->module;
+                m->exports=result; m->loaded=true;
+                lvm.loading_count--;
+                lvm.stack_top=frame->slots; push(result);
+                LOAD_FRAME(); break;
+            }
+            case OP_IMPORT:
+                if(!import_module(frame->closure->function->module)) return INTERPRET_RUNTIME_ERR;
+                LOAD_FRAME(); break;
             case OP_STRUCT: k=READ_CONST(); op_struct: push(OBJ_VAL(new_struct(AS_STRING(k)))); break;
             case OP_GET_PROPERTY: k=READ_CONST(); op_get_property: {
                 if(!IS_INSTANCE(peek(0))){
@@ -619,7 +812,7 @@ static InterpretResult run() {
             case OP_INVOKE: k=READ_CONST(); op_invoke: {
                 ObjString* method=AS_STRING(k); int argc=READ_BYTE();
                 if(!invoke(method,argc)) return INTERPRET_RUNTIME_ERR;
-                frame=&lvm.frames[lvm.frame_count-1]; break;
+                LOAD_FRAME(); break;
             }
             case OP_INHERIT: {
                 if(!IS_STRUCT(peek(1))){ runtime_error("Supertype must be a struct."); return INTERPRET_RUNTIME_ERR; }
@@ -634,7 +827,7 @@ static InterpretResult run() {
             case OP_SUPER_INVOKE: k=READ_CONST(); op_super_invoke: {
                 ObjString* method=AS_STRING(k); int argc=READ_BYTE(); ObjStruct* sup=AS_STRUCT(pop());
                 if(!invoke_from_class(sup,method,argc)) return INTERPRET_RUNTIME_ERR;
-                frame=&lvm.frames[lvm.frame_count-1]; break;
+                LOAD_FRAME(); break;
             }
             case OP_APPEND_ARRAY: {
                 int n = READ_BYTE();
@@ -671,6 +864,7 @@ static InterpretResult run() {
                 return INTERPRET_RUNTIME_ERR;
         }
     }
+#undef LOAD_FRAME
 #undef READ_BYTE
 #undef READ_SHORT
 #undef READ_24

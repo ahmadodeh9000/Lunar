@@ -1,0 +1,17 @@
+// import gives the value of a file's top-level ret.
+let vec = import("lib/vec.lunar");
+print vec.len2(vec.add({ x: 1, y: 2 }, { x: 2, y: 2 }));
+let Shape = import("lib/shape.lunar");
+print Shape("square", 4).describe();
+print import("lib/plain.lunar");
+print import("lib/noret.lunar");
+print import("lib/midret.lunar");
+
+// import is an expression: anywhere, with a computed path, inside functions
+let name = "plain";
+print import("lib/" + name + ".lunar") + 1;
+fn load() { ret import("lib/vec.lunar"); }
+print load() == vec;
+let paths = ["lib/plain.lunar", "lib/noret.lunar"];
+for (p in paths) print import(p);
+try { print import("lib/plain.lunar"); } catch (e) { print "never"; }

@@ -1,0 +1,3 @@
+a sees [b sees [c sees 42]]
+-- stderr --
+-- exit 0 --

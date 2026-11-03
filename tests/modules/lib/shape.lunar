@@ -1,0 +1,6 @@
+// Exports a struct directly.
+struct Shape {
+    init(name, sides) { self.name = name; self.sides = sides; }
+    describe() { ret "{self.name} has {self.sides} sides"; }
+}
+ret Shape;

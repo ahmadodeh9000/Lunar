@@ -28,6 +28,7 @@ typedef enum {
     OBJ_FFI_LIB, 
     OBJ_FFI_FUNC , 
     OBJ_MAP,
+    OBJ_MODULE,
 } ObjType;
 
 struct Obj {
@@ -74,6 +75,16 @@ typedef struct ObjUpvalue {
     struct ObjUpvalue* next;
 } ObjUpvalue;
 
+/* ── Module: one source file, its globals, and what it exports ── */
+typedef struct ObjModule {
+    Obj obj;
+    ObjString* file;        // canonical path, the import cache key; NULL for the REPL
+    ObjString* name;        // the path shown in messages and traces
+    Table globals;          // starts as a copy of the built-ins
+    Value exports;          // the value of the file's top-level ret
+    bool loaded;            // false while its top-level code is still running
+} ObjModule;
+
 /* ── Function ── */
 typedef struct {
     Obj obj;
@@ -81,6 +92,7 @@ typedef struct {
     int upvalue_count;
     Chunk chunk;
     ObjString* name;
+    ObjModule* module;      // the file it was compiled from; its globals are the module's
 } ObjFunction;
 
 /* ── Native function ── */
@@ -175,6 +187,8 @@ static inline bool is_obj_type(Value value, ObjType type) {
 #define AS_ARRAY(value)  ((ObjArray*)AS_OBJ(value))               // ARRAY
 #define IS_MAP(value)    is_obj_type(value, OBJ_MAP)              // MAP
 #define AS_MAP(value)    ((ObjMap*)AS_OBJ(value))                 // MAP
+#define IS_MODULE(value) is_obj_type(value, OBJ_MODULE)           // MODULE
+#define AS_MODULE(value) ((ObjModule*)AS_OBJ(value))              // MODULE
 
 
 ObjString*      copy_str(const char* chars, int length);
@@ -190,6 +204,7 @@ ObjFFILib* new_ffi_lib(ObjString* path, void* handle);      // FFI
 ObjFFIFunc* new_ffi_func(ObjString* name, void* symbol);    // FFI
 ObjArray* new_array();                                      // array
 ObjMap* new_map();                                          // map
+ObjModule* new_module(ObjString* file, ObjString* name);    // module
 
 
 void printObject(Value value);

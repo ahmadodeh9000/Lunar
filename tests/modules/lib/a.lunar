@@ -1,0 +1,3 @@
+// Imports relative to this file: b.lunar is lib/b.lunar.
+let b = import("b.lunar");
+ret "a sees [" + b + "]";

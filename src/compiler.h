@@ -12,7 +12,8 @@
 #error "libffi header not found"
 #endif
 
-ObjFunction* compile(const char* src);
+// compiles a file's source; every function it makes belongs to module
+ObjFunction* compile(const char* src, ObjModule* module);
 void mark_compiler_roots();
 
 #endif

@@ -10,8 +10,12 @@
 #     <stderr>
 #     -- exit 0 --
 # Scripts run from the repo root. Sanitizer reports land in stderr, so they fail the test.
+# The repo's absolute path is written as <root> in the output, so .expected files don't
+# depend on where the repo is. Files under a lib/ directory are modules the tests import,
+# not tests themselves.
 
 LUNAR=${1:-./lunar}
+ROOT=$(pwd -P)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
@@ -21,7 +25,7 @@ pass=0
 fail=0
 failed=""
 
-for test in $(find tests -name '*.lunar' | sort); do
+for test in $(find tests -name '*.lunar' -not -path '*/lib/*' | sort); do
     expected="${test%.lunar}.expected"
     "$LUNAR" "$test" > "$TMP/out" 2> "$TMP/err"
     status=$?
@@ -30,7 +34,7 @@ for test in $(find tests -name '*.lunar' | sort); do
         echo "-- stderr --"
         cat "$TMP/err"
         echo "-- exit $status --"
-    } > "$TMP/actual"
+    } | sed "s|$ROOT|<root>|g" > "$TMP/actual"
 
     if [ -n "$UPDATE" ]; then
         cp "$TMP/actual" "$expected"

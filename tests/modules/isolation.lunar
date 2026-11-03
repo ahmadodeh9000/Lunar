@@ -1,0 +1,11 @@
+// Each module has its own globals; built-ins are visible everywhere.
+let main_only = "main's global";
+let shared_name = "from main";
+let iso = import("lib/isolation.lunar");
+print iso.shared_name;
+print import("lib/isolation2.lunar");
+print shared_name;
+print iso.my_str;
+print str(1);                 // the main script's str is still the built-in
+print iso.builtin_len;
+try { iso.read_main_global(); } catch (e) { print e; }

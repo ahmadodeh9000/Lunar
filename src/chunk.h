@@ -32,6 +32,7 @@ typedef enum {
     OP_ITER_PREP, OP_FOR_ITER,
     OP_TRY, OP_POP_HANDLER, OP_THROW,
     OP_BUILD_STRING,
+    OP_IMPORT, OP_MODULE_RET,
     OP_WIDE,        // prefix: the next opcode's constant index is 3 bytes, not 1
 } OpCode;
 

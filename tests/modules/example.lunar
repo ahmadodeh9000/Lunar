@@ -1,0 +1,2 @@
+// The multi-file example in examples/modules runs from another directory.
+import("../../examples/modules/main.lunar");

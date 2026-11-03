@@ -24,13 +24,13 @@ static void repl() {
     for (;;) {
         printf("> ");
         if (!fgets(line, sizeof(line), stdin)) { printf("\n"); break; }
-        interpret(line);
+        interpret(line, NULL);
     }
 }
 
 static void run_file(const char* fname) {
     char* src = readFile(fname);
-    InterpretResult ir = interpret(src);
+    InterpretResult ir = interpret(src, fname);
     free(src);
     if (ir == INTERPRET_RUNTIME_ERR) exit(LUNAR_RUNTIME_ERROR_CODE);
     if (ir == INTERPRET_COMPILE_ERR) exit(LUNAR_COMPILETIME_ERROR_CODE);

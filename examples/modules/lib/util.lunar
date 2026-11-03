@@ -1,0 +1,16 @@
+// Small helpers shared by the other modules. It's imported twice, but runs once.
+print "(util.lunar loaded)";
+
+fn clamp(v, lo, hi) {
+    if (v < lo) ret lo;
+    if (v > hi) ret hi;
+    ret v;
+}
+
+fn pad(s, width) {
+    let out = s;
+    while (len(out) < width) out = out + " ";
+    ret out;
+}
+
+ret { clamp: clamp, pad: pad };

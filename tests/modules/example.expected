@@ -1,0 +1,9 @@
+(util.lunar loaded)
+position: {x: 100, y: 0}
+speed: 25
+inventory:
+  potion  1
+  arrow   12
+can't: no sword left
+-- stderr --
+-- exit 0 --

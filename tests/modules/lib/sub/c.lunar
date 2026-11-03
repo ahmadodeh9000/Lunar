@@ -1,0 +1,2 @@
+let p = import("../plain.lunar");
+ret "c sees " + str(p);

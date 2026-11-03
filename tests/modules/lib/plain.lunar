@@ -1,0 +1,2 @@
+// Exports a plain value.
+ret 42;

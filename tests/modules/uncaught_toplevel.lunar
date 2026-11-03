@@ -1,0 +1,3 @@
+// An uncaught error in a module's top-level code.
+print "importing";
+import("lib/throws.lunar");

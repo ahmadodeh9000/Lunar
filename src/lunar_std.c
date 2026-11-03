@@ -53,6 +53,9 @@ static void sb_object(StrBuf* sb, Value v) {
             sb_cstr(sb, "<native fn "); sb_cstr(sb, ((ObjNative*)AS_OBJ(v))->name); sb_cstr(sb, ">");
             break;
         case OBJ_UPVALUE:      sb_cstr(sb, "<upvalue>"); break;
+        case OBJ_MODULE:
+            sb_cstr(sb, "<module "); sb_cstr(sb, AS_MODULE(v)->name->chars); sb_cstr(sb, ">");
+            break;
         case OBJ_STRUCT:
             sb_cstr(sb, "<struct "); sb_cstr(sb, AS_STRUCT(v)->name->chars); sb_cstr(sb, ">");
             break;
@@ -131,6 +134,7 @@ const char* value_type_name(Value v) {
         case OBJ_BOUND_METHOD: case OBJ_FFI_FUNC:
                                return "function";
         case OBJ_UPVALUE:      return "upvalue";
+        case OBJ_MODULE:       return "module";
     }
     return "value";
 }

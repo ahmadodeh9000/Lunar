@@ -1,0 +1,2 @@
+// A module importing the main script is a cycle.
+try { import("lib/back_to_main.lunar"); } catch (e) { print e; }

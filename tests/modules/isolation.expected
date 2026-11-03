@@ -1,0 +1,9 @@
+from isolation.lunar
+from isolation2.lunar
+from main
+module str
+1
+3
+Undefined variable 'main_only'.
+-- stderr --
+-- exit 0 --

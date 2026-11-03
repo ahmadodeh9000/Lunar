@@ -1,0 +1,3 @@
+before
+-- stderr --
+-- exit 0 --

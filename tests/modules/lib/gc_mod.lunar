@@ -1,0 +1,14 @@
+// Builds data each call, so the GC stress build collects while modules hold state.
+let made = [];
+fn make(n) {
+    let m = {};
+    for (let i = 0; i < n; i = i + 1) m["k{i}"] = [i, "v{i}"];
+    push(made, m);
+    ret m;
+}
+fn total() {
+    let t = 0;
+    for (m in made) for (k, v in m) t = t + v[0];
+    ret t;
+}
+ret { make: make, total: total };

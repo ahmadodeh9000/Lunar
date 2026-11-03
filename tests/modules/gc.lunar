@@ -1,0 +1,6 @@
+// Modules holding state while the GC runs (also under GC stress).
+let g = import("lib/gc_mod.lunar");
+for (let i = 0; i < 30; i = i + 1) g.make(20);
+print g.total();
+let again = import("lib/gc_mod.lunar");
+print again == g;

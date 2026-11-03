@@ -1,0 +1,4 @@
+// An uncaught error in a module's function: the trace names the file.
+let errfn = import("lib/errfn.lunar");
+print "calling";
+errfn.boom();

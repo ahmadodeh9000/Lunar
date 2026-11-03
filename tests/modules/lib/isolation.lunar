@@ -1,0 +1,10 @@
+// Its own globals: it can't see the main script's, and its str is only its own.
+let shared_name = "from isolation.lunar";
+fn str(x) { ret "module str"; }
+fn read_main_global() { ret main_only; }
+ret {
+    shared_name: shared_name,
+    my_str: str(1),
+    builtin_len: len("abc"),
+    read_main_global: read_main_global,
+};

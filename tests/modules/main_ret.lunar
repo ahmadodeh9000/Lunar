@@ -1,0 +1,5 @@
+// ret at the top level of the main script ends it (its value is ignored).
+print "before";
+let x = 1;
+if (x == 1) ret 42;
+print "never";

@@ -1,0 +1,5 @@
+// Prints when it runs, so tests can see it runs only once.
+print "counter.lunar loaded";
+let count = 0;
+fn next() { count = count + 1; ret count; }
+ret { next: next };

@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at '"lib/plain.lunar"': Expect '(' after 'import'.
+-- exit 110 --

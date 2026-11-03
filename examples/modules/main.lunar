@@ -1,0 +1,23 @@
+// A small multi-file program. Run it from anywhere:
+//     ./lunar examples/modules/main.lunar
+// Each import path is relative to the file that contains it.
+let vec = import("lib/vec.lunar");
+let inv = import("lib/inventory.lunar");
+
+let pos = { x: 90, y: 10 };
+let vel = { x: 15, y: -20 };
+pos = vec.clamp(vec.add(pos, vel), 100, 100);
+print "position: {pos}";
+print "speed: {vec.length(vel)}";
+
+let bag = inv.Inventory();
+bag.add("potion", 2);
+bag.add("arrow", 12);
+bag.take("potion");
+print "inventory:";
+inv.show(bag);
+try {
+    bag.take("sword");
+} catch (e) {
+    print "can't: {e}";
+}

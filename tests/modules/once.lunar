@@ -1,0 +1,9 @@
+// A module runs once; every import of the same file gets the same value.
+let a = import("lib/counter.lunar");
+let b = import("./lib/counter.lunar");
+let c = import("lib/../lib/counter.lunar");
+print a == b && b == c;
+print a.next();
+print b.next();
+print import("lib/uses_counter.lunar").from_uses;
+print c.next();

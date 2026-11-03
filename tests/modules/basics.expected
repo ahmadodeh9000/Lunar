@@ -1,0 +1,13 @@
+25
+square has 4 sides
+42
+nil
+midret: running
+early
+43
+true
+42
+nil
+42
+-- stderr --
+-- exit 0 --

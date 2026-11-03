@@ -1,0 +1,2 @@
+let shared_name = "from isolation2.lunar";
+ret shared_name;

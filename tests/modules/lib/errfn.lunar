@@ -1,0 +1,6 @@
+// An error inside an exported function.
+fn helper(list) {
+    ret list[10];
+}
+fn boom() { ret helper([1, 2]); }
+ret { boom: boom };

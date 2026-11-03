@@ -95,6 +95,7 @@ static TokenType identifier_type() {
                 switch (scanner.start[1]) {
                     case 'f': return checkKeyword(2,0,"",TOKEN_IF);
                     case 'n': return checkKeyword(2,0,"",TOKEN_IN);
+                    case 'm': return checkKeyword(2,4,"port",TOKEN_IMPORT);
                 }
             }
             break;

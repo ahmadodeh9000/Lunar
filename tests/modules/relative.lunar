@@ -1,0 +1,2 @@
+// Paths are relative to the importing file, not to where lunar was started.
+print import("lib/a.lunar");

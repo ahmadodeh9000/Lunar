@@ -1,0 +1,3 @@
+// Imports a module another file already imported: same cached exports.
+let c = import("counter.lunar");
+ret { from_uses: c.next() };

@@ -30,12 +30,19 @@ typedef struct {
     Value   stack[STACK_MAX];
     Value*  stack_top;
 
-    Table   globals;    // global variables
+    Table   builtins;   // natives, copied into every module's globals
+    Table   modules;    // canonical path -> ObjModule, the import cache
+    struct ObjModule* main_module;   // the script being run, or the REPL
+    char*   main_dir;   // its directory; module names are shown relative to it
     Table   strings;    // interned strings
 
     ObjString* init_string;     // cached "init" identifier for constructors
 
     ObjUpvalue* open_upvalues;  // linked list of open upvalues
+
+    // modules whose top-level code is running, outermost first, for finding cycles
+    struct { struct ObjModule* module; int frame; } loading[FRAMES_MAX];
+    int     loading_count;
 
     Handler handlers[HANDLERS_MAX];
     int     handler_count;
@@ -62,7 +69,8 @@ extern LunarVM lvm;
 void init_lunar_vm();
 void free_lunar_vm();
 
-InterpretResult interpret(const char* src);
+// path is the script's file, or NULL for the REPL
+InterpretResult interpret(const char* src, const char* path);
 void push(Value val);
 Value pop();
 

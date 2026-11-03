@@ -1,0 +1,2 @@
+// No ret: importing it gives nil.
+let hidden = 1;

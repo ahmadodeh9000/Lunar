@@ -1,0 +1,18 @@
+Can't find module 'lib/nope.lunar' (looked for <root>/tests/modules/lib/nope.lunar).
+Circular import: lib/cycle_a.lunar -> lib/cycle_b.lunar -> lib/cycle_a.lunar.
+Circular import: lib/cycle_x.lunar -> lib/cycle_y.lunar -> lib/cycle_z.lunar -> lib/cycle_x.lunar.
+Circular import: lib/self.lunar -> lib/self.lunar.
+throws.lunar running
+module failed
+throws.lunar running
+module failed
+Can't compile module 'lib/bad_syntax.lunar'.
+Can't read module 'lib/sub/'.
+No built-in module named 'string' (to import a file, use 'string.lunar').
+No built-in module named 'utils' (to import a file, use 'utils.lunar').
+import() expects a string path (got number).
+import() expects a string path (got nil).
+42
+-- stderr --
+[lib/bad_syntax.lunar line 3] ERROR at '=': Expect variable name.
+-- exit 0 --

@@ -1,0 +1,20 @@
+// An inventory struct, plus a function that prints one.
+let util = import("util.lunar");
+
+struct Inventory {
+    init() { self.items = {}; }
+    add(name, count) {
+        if (!has(self.items, name)) self.items[name] = 0;
+        self.items[name] = self.items[name] + count;
+    }
+    take(name) {
+        if (!has(self.items, name) || self.items[name] == 0) throw "no {name} left";
+        self.items[name] = self.items[name] - 1;
+    }
+}
+
+fn show(inv) {
+    for (name, count in inv.items) print "  " + util.pad(name, 8) + str(count);
+}
+
+ret { Inventory: Inventory, show: show };

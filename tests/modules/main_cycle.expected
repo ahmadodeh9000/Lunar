@@ -1,0 +1,3 @@
+Circular import: main_cycle.lunar -> lib/back_to_main.lunar -> main_cycle.lunar.
+-- stderr --
+-- exit 0 --

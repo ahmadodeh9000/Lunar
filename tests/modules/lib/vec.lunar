@@ -1,0 +1,4 @@
+// A map of functions: the usual way to export from a module.
+fn add(a, b) { ret { x: a.x + b.x, y: a.y + b.y }; }
+fn len2(v) { ret v.x * v.x + v.y * v.y; }
+ret { add: add, len2: len2 };

@@ -1,0 +1,4 @@
+// ret in the middle ends the file.
+print "midret: running";
+ret "early";
+print "midret: never";

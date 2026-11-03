@@ -1,0 +1,7 @@
+importing
+throws.lunar running
+-- stderr --
+module failed
+[lib/throws.lunar line 3] in module
+[line 3] in script
+-- exit 100 --

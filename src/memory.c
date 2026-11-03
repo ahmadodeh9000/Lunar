@@ -105,8 +105,10 @@ static void mark_roots() {
         mark_object((Obj*)uv);
     }
 
-    // globals
-    mark_table(&lvm.globals);
+    // built-ins, and every module (each holds its own globals)
+    mark_table(&lvm.builtins);
+    mark_table(&lvm.modules);
+    mark_object((Obj*)lvm.main_module);
 
     // compiler roots
     mark_compiler_roots();
@@ -135,7 +137,17 @@ static void blacken_object(Obj* object) {
         case OBJ_FUNCTION: {
             ObjFunction* fn = (ObjFunction*)object;
             mark_object((Obj*)fn->name);
+            mark_object((Obj*)fn->module);
             mark_array(&fn->chunk.constants);
+            break;
+        }
+
+        case OBJ_MODULE: {
+            ObjModule* module = (ObjModule*)object;
+            mark_object((Obj*)module->file);
+            mark_object((Obj*)module->name);
+            mark_table(&module->globals);
+            mark_value(module->exports);
             break;
         }
 
@@ -280,6 +292,12 @@ void freeObject(Obj* object) {
             ObjFunction* fn = (ObjFunction*)object;
             free_chunk(&fn->chunk);
             FREE(ObjFunction, object);
+            break;
+        }
+        case OBJ_MODULE: {
+            ObjModule* module = (ObjModule*)object;
+            free_table(&module->globals);
+            FREE(ObjModule, object);
             break;
         }
         case OBJ_NATIVE:

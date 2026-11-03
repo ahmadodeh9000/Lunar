@@ -3,6 +3,7 @@
 #include "common.h"
 #include "object.h"
 #include "memory.h"
+#include "vm.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,6 +116,7 @@ typedef struct ClassCompiler {
 Parser        parser;
 Compiler*     current     = NULL;
 ClassCompiler* current_class = NULL;
+ObjModule*    compiling_module = NULL;    // the file being compiled
 
 /* ═══════════════════════════════════════════
    Forward declarations
@@ -149,7 +151,10 @@ static void error_at(Token* tok, const char* msg) {
     if (parser.panic_mode) return;
     parser.panic_mode = true;
 
-    fprintf(stderr, "[line %d] ERROR", tok->line);
+    if (compiling_module != lvm.main_module)    // an imported file: say which one
+        fprintf(stderr, "[%s line %d] ERROR", compiling_module->name->chars, tok->line);
+    else
+        fprintf(stderr, "[line %d] ERROR", tok->line);
 
     if      (TOKEN_EOF   == tok->type) fprintf(stderr, " at end");
     else if (TOKEN_ERROR == tok->type) { /* nothing */ }
@@ -206,7 +211,7 @@ static void emit_return() {
     } else {
         emit_byte(OP_NIL);
     }
-    emit_byte(OP_RET);
+    emit_byte(current->type == TYPE_SCRIPT ? OP_MODULE_RET : OP_RET);
 }
 
 /*
@@ -276,6 +281,7 @@ static void init_compiler(Compiler* compiler, FunctionType type) {
     compiler->loop        = NULL;
     compiler->try_depth   = 0;
     compiler->function    = new_function();
+    compiler->function->module = compiling_module;
     current               = compiler;
 
     if (type != TYPE_SCRIPT) {
@@ -699,6 +705,15 @@ static void subscript(bool can_assign) {
     }
 }
 
+// import(path): the module's exports. A keyword, not a function, since it may start a
+// new frame to run the module's top-level code.
+static void import_(bool can_assign) {
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'import'.");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after import path.");
+    emit_byte(OP_IMPORT);
+}
+
 static void and_(bool can_assign) {
     int end_jump = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
@@ -836,6 +851,7 @@ ParseRule rules[] = {
     [TOKEN_TRY]                 = {NULL,       NULL,    PREC_NONE},
     [TOKEN_CATCH]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_THROW]               = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_IMPORT]              = {import_,    NULL,    PREC_NONE},
     [TOKEN_ERROR]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_EOF]                 = {NULL,       NULL,    PREC_NONE},
 };
@@ -1064,9 +1080,8 @@ static void emit_handler_pops() {
     for (int i = 0; i < current->try_depth; i++) emit_byte(OP_POP_HANDLER);
 }
 
+// In a file's top-level code, ret ends the file: its value is what import() gives.
 static void return_statement() {
-    if (current->type == TYPE_SCRIPT) error("Can't return from top-level code.");
-
     if (match(TOKEN_SEMICOLON)) {
         emit_handler_pops();
         emit_return();
@@ -1076,7 +1091,7 @@ static void return_statement() {
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
         emit_handler_pops();    // after the value, so an error computing it is still caught
-        emit_byte(OP_RET);
+        emit_byte(current->type == TYPE_SCRIPT ? OP_MODULE_RET : OP_RET);
     }
 }
 
@@ -1284,8 +1299,9 @@ static void declaration() {
    Entry points
    ═══════════════════════════════════════════ */
 
-ObjFunction* compile(const char* src) {
+ObjFunction* compile(const char* src, ObjModule* module) {
     init_scanner(src);
+    compiling_module = module;
 
     Compiler compiler;
     init_compiler(&compiler, TYPE_SCRIPT);

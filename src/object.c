@@ -84,6 +84,7 @@ ObjFunction* new_function() {
     fn->arity        = 0;
     fn->upvalue_count = 0;
     fn->name         = NULL;
+    fn->module       = NULL;
     init_chunk(&fn->chunk);
     return fn;
 }
@@ -159,6 +160,16 @@ ObjMap* new_map() {
     map->index          = NULL;
     map->index_capacity = 0;
     return map;
+}
+
+ObjModule* new_module(ObjString* file, ObjString* name) {
+    ObjModule* module = ALLOCATE_OBJ(ObjModule, OBJ_MODULE);
+    module->file      = file;
+    module->name      = name;
+    init_table(&module->globals);
+    module->exports   = NIL_VAL;
+    module->loaded    = false;
+    return module;
 }
 
 ObjFFILib* new_ffi_lib(ObjString* path, void* handle) {
@@ -249,6 +260,10 @@ void printObject(Value value) {
             printf("<ffi native fn '%s'>", AS_FFI_FUNC(value)->name->chars);
             break;
 
+
+        case OBJ_MODULE:
+            printf("<module %s>", AS_MODULE(value)->name->chars);
+            break;
 
         case OBJ_ARRAY: {
             ObjArray* a = AS_ARRAY(value);
