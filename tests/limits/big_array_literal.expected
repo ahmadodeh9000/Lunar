@@ -1,0 +1,19 @@
+254: len 254, first 0, last 253, sum 32131
+255: len 255, first 0, last 254, sum 32385
+256: len 256, first 0, last 255, sum 32640
+509: len 509, first 0, last 508, sum 129286
+510: len 510, first 0, last 509, sum 129795
+511: len 511, first 0, last 510, sum 130305
+765: len 765, first 0, last 764, sum 292230
+1000: len 1000, first 0, last 999, sum 499500
+256 with trailing comma: len 256, first 0, last 255, sum 32640
+[253, 254, 255, 256, 509, 510, 511, 599]
+20000: len 20000, first 0, last 999, sum 9.99e+06
+[s0, [1], 2, s255, [256], 299]
+600
+1299
+400
+300
+pushed
+-- stderr --
+-- exit 0 --

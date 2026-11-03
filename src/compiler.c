@@ -123,7 +123,7 @@ static void statement();
 static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
-static u8   identifier_constant(Token* name);
+static int  identifier_constant(Token* name);
 static int  resolve_local(Compiler* compiler, Token* name);
 static int  resolve_upvalue(Compiler* compiler, Token* name);
 static void and_(bool can_assign);
@@ -215,17 +215,28 @@ static u8 make_const(Value val) {
 }
 */
 
-static u8 make_const(Value val) {
+#define MAX_CONSTANTS (1 << 24)   // OP_WIDE has a 3-byte index
+
+static int make_const(Value val) {
     Chunk* chunk = current_chunk();
     for (int i = 0; i < chunk->constants.count; i++) {
-        if (values_equ(chunk->constants.values[i], val)) return (u8)i;
+        if (values_equ(chunk->constants.values[i], val)) return i;
     }
     int c = add_constant(chunk, val);
-    if (c > UINT8_MAX) { error("Too many constants in one chunk."); return 0; }
-    return (u8)c;
+    if (c >= MAX_CONSTANTS) { error("Too many constants in one chunk."); return 0; }
+    return c;
 }
 
-static void emit_const(Value value) { emit_bytes(OP_CONST, make_const(value)); }
+// emits an opcode whose operand is a constant index, using OP_WIDE past 255
+static void emit_const_op(u8 op, int index) {
+    if (index <= UINT8_MAX) { emit_bytes(op, (u8)index); return; }
+    emit_bytes(OP_WIDE, op);
+    emit_byte((index >> 16) & 0xff);
+    emit_byte((index >>  8) & 0xff);
+    emit_byte( index        & 0xff);
+}
+
+static void emit_const(Value value) { emit_const_op(OP_CONST, make_const(value)); }
 
 /* ── Jump patching ── */
 static int emit_jump(u8 instruction) {
@@ -419,7 +430,7 @@ static void declare_variable() {
     add_local(*name);
 }
 
-static u8 parse_variable(const char* err_msg) {
+static int parse_variable(const char* err_msg) {
     consume(TOKEN_IDENTIFIER, err_msg);
     declare_variable();
     if (current->scope_depth > 0) return 0; // locals use slot, not constant
@@ -431,12 +442,12 @@ static void mark_initialized() {
     current->locals[current->local_count - 1].depth = current->scope_depth;
 }
 
-static void define_variable(u8 global) {
+static void define_variable(int global) {
     if (current->scope_depth > 0) { mark_initialized(); return; }
-    emit_bytes(OP_DEFINE_GLOBAL, global);
+    emit_const_op(OP_DEFINE_GLOBAL, global);
 }
 
-static u8 identifier_constant(Token* name) {
+static int identifier_constant(Token* name) {
     return make_const(OBJ_VAL(copy_str(name->start, name->length)));
 }
 
@@ -529,34 +540,40 @@ static void call_(bool can_assign) {
 
 static void dot(bool can_assign) {
     consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
-    u8 name = identifier_constant(&parser.prev);
+    int name = identifier_constant(&parser.prev);
 
     if (can_assign && match(TOKEN_EQUAL)) {
         expression();
-        emit_bytes(OP_SET_PROPERTY, name);
+        emit_const_op(OP_SET_PROPERTY, name);
     } else if (match(TOKEN_LEFT_PAREN)) {
         // optimised method invoke
         u8 argc = argument_list();
-        emit_byte(OP_INVOKE);
-        emit_byte(name);
+        emit_const_op(OP_INVOKE, name);
         emit_byte(argc);
     } else {
-        emit_bytes(OP_GET_PROPERTY, name);
+        emit_const_op(OP_GET_PROPERTY, name);
     }
 }
 
+// Elements go on the stack 255 at a time: the first batch builds the array,
+// later batches are appended to it, so a literal of any size uses little stack.
 static void array_literal(bool can_assign) {
-    int count = 0;
+    int  count = 0;
+    bool built = false;
     if (!check(TOKEN_RIGHT_BRACKET)) {
         do {
             if (check(TOKEN_RIGHT_BRACKET)) break;   // this is a feature btw (if u hate it just remove it twin...)
             expression();
-            if (count == 255) error("Can't have more than 255 array elements.");
-            count++;
+            if (++count == UINT8_MAX) {
+                emit_bytes(built ? OP_APPEND_ARRAY : OP_BUILD_ARRAY, (u8)count);
+                built = true;
+                count = 0;
+            }
         } while (match(TOKEN_COMMA));
     }
     consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array elements.");
-    emit_bytes(OP_BUILD_ARRAY, (u8)count);
+    if (!built)          emit_bytes(OP_BUILD_ARRAY, (u8)count);
+    else if (count > 0)  emit_bytes(OP_APPEND_ARRAY, (u8)count);
 }
 
 
@@ -606,9 +623,9 @@ static void named_variable(Token name, bool can_assign) {
 
     if (can_assign && match(TOKEN_EQUAL)) {
         expression();
-        emit_bytes(set_op, (u8)arg);
+        emit_const_op(set_op, arg);     // a local or upvalue index is always < 256
     } else {
-        emit_bytes(get_op, (u8)arg);
+        emit_const_op(get_op, arg);
     }
 }
 
@@ -634,19 +651,18 @@ static void super_(bool can_assign) {
 
     consume(TOKEN_DOT,        "Expect '.' after 'super'.");
     consume(TOKEN_IDENTIFIER, "Expect supertype method name.");
-    u8 name = identifier_constant(&parser.prev);
+    int name = identifier_constant(&parser.prev);
 
     named_variable(synthetic_token("self"),  false);
 
     if (match(TOKEN_LEFT_PAREN)) {
         u8 argc = argument_list();
         named_variable(synthetic_token("super"), false);
-        emit_byte(OP_SUPER_INVOKE);
-        emit_byte(name);
+        emit_const_op(OP_SUPER_INVOKE, name);
         emit_byte(argc);
     } else {
         named_variable(synthetic_token("super"), false);
-        emit_bytes(OP_GET_SUPER, name);
+        emit_const_op(OP_GET_SUPER, name);
     }
 }
 
@@ -800,7 +816,7 @@ static void for_statement() {
         // no initializer
     } else if (match(TOKEN_LET)) {
         // variable declaration as initializer
-        u8 global = parse_variable("Expect variable name.");
+        int global = parse_variable("Expect variable name.");
         if (match(TOKEN_EQUAL)) expression(); else emit_byte(OP_NIL);
         consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
         define_variable(global);
@@ -922,7 +938,7 @@ static void function(FunctionType type) {
         do {
             current->function->arity++;
             if (current->function->arity > 255) error_at_current("Can't have more than 255 parameters.");
-            u8 constant = parse_variable("Expect parameter name.");
+            int constant = parse_variable("Expect parameter name.");
             define_variable(constant);
         } while (match(TOKEN_COMMA));
     }
@@ -931,7 +947,7 @@ static void function(FunctionType type) {
     block();
 
     ObjFunction* fn = end_compiler();
-    emit_bytes(OP_CLOSURE, make_const(OBJ_VAL(fn)));
+    emit_const_op(OP_CLOSURE, make_const(OBJ_VAL(fn)));
 
     // emit upvalue descriptors
     for (int i = 0; i < fn->upvalue_count; i++) {
@@ -941,14 +957,14 @@ static void function(FunctionType type) {
 }
 
 static void fn_declaration() {
-    u8 global = parse_variable("Expect function name.");
+    int global = parse_variable("Expect function name.");
     mark_initialized();
     function(TYPE_FUNCTION);
     define_variable(global);
 }
 
 static void let_declaration() {
-    u8 global = parse_variable("Expect variable name.");
+    int global = parse_variable("Expect variable name.");
 
     if (match(TOKEN_EQUAL)) {
         expression();
@@ -961,7 +977,7 @@ static void let_declaration() {
 
 static void method() {
     consume(TOKEN_IDENTIFIER, "Expect method name.");
-    u8 constant = identifier_constant(&parser.prev);
+    int constant = identifier_constant(&parser.prev);
 
     FunctionType type = TYPE_METHOD;
     if (parser.prev.length == 4 && memcmp(parser.prev.start, "init", 4) == 0) {
@@ -969,16 +985,16 @@ static void method() {
     }
 
     function(type);
-    emit_bytes(OP_METHOD, constant);
+    emit_const_op(OP_METHOD, constant);
 }
 
 static void struct_declaration() {
     consume(TOKEN_IDENTIFIER, "Expect struct name.");
     Token struct_name = parser.prev;
-    u8    name_const  = identifier_constant(&parser.prev);
+    int   name_const  = identifier_constant(&parser.prev);
 
     declare_variable();
-    emit_bytes(OP_STRUCT, name_const);
+    emit_const_op(OP_STRUCT, name_const);
     define_variable(name_const);
 
     ClassCompiler class_compiler;

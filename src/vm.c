@@ -231,6 +231,7 @@ static InterpretResult run() {
 
 #define READ_BYTE()   (*frame->ip++)
 #define READ_SHORT()  (frame->ip+=2,(u16)((frame->ip[-2]<<8)|frame->ip[-1]))
+#define READ_24()     (frame->ip+=3,(u32)((frame->ip[-3]<<16)|(frame->ip[-2]<<8)|frame->ip[-1]))
 #define READ_CONST()  (frame->closure->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONST())
 
@@ -242,6 +243,8 @@ static InterpretResult run() {
     if(!IS_NUMBER(peek(0))||!IS_NUMBER(peek(1))){ runtime_error("Operands must be numbers."); return INTERPRET_RUNTIME_ERR; } \
     i32 b=(i32)AS_NUMBER(pop()),a=(i32)AS_NUMBER(pop()); push(NUMBER_VAL((double)(a op b))); }while(0)
 
+    Value k;    // the constant operand; OP_WIDE loads it and jumps to the opcode's label
+
     for(;;){
 #ifdef LUNAR_DEBUG_TRACE_EXECUTION
         printf("          ");
@@ -250,21 +253,21 @@ static InterpretResult run() {
         disassemble_instruction(&frame->closure->function->chunk,(int)(frame->ip-frame->closure->function->chunk.code));
 #endif
         switch(READ_BYTE()){
-            case OP_CONST:   push(READ_CONST()); break;
+            case OP_CONST:   k=READ_CONST(); op_const: push(k); break;
             case OP_NIL:     push(NIL_VAL); break;
             case OP_TRUE:    push(BOOL_VAL(true)); break;
             case OP_FALSE:   push(BOOL_VAL(false)); break;
             case OP_POP:     pop(); break;
             case OP_GET_LOCAL:  push(frame->slots[READ_BYTE()]); break;
             case OP_SET_LOCAL:  frame->slots[READ_BYTE()]=peek(0); break;
-            case OP_DEFINE_GLOBAL: { ObjString* n=READ_STRING(); table_set(&lvm.globals,n,peek(0)); pop(); break; }
-            case OP_GET_GLOBAL: {
-                ObjString* n=READ_STRING(); Value v;
+            case OP_DEFINE_GLOBAL: k=READ_CONST(); op_define_global: { ObjString* n=AS_STRING(k); table_set(&lvm.globals,n,peek(0)); pop(); break; }
+            case OP_GET_GLOBAL: k=READ_CONST(); op_get_global: {
+                ObjString* n=AS_STRING(k); Value v;
                 if(!table_get(&lvm.globals,n,&v)){ runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
                 push(v); break;
             }
-            case OP_SET_GLOBAL: {
-                ObjString* n=READ_STRING();
+            case OP_SET_GLOBAL: k=READ_CONST(); op_set_global: {
+                ObjString* n=AS_STRING(k);
                 if(table_set(&lvm.globals,n,peek(0))){ table_delete(&lvm.globals,n); runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
                 break;
             }
@@ -307,8 +310,8 @@ static InterpretResult run() {
             case OP_JUMP:          { u16 o=READ_SHORT(); frame->ip+=o; break; }
             case OP_JUMP_IF_FALSE: { u16 o=READ_SHORT(); if(is_falsey(peek(0))) frame->ip+=o; break; }
             case OP_LOOP:          { u16 o=READ_SHORT(); frame->ip-=o; break; }
-            case OP_CLOSURE: {
-                ObjFunction* fn=AS_FUNCTION(READ_CONST());
+            case OP_CLOSURE: k=READ_CONST(); op_closure: {
+                ObjFunction* fn=AS_FUNCTION(k);
                 ObjClosure* closure=new_closure(fn);
                 push(OBJ_VAL(closure));
                 for(int i=0;i<closure->upvalue_count;i++){
@@ -385,24 +388,24 @@ static InterpretResult run() {
                 lvm.stack_top=frame->slots; push(result);
                 frame=&lvm.frames[lvm.frame_count-1]; break;
             }
-            case OP_STRUCT: push(OBJ_VAL(new_struct(READ_STRING()))); break;
-            case OP_GET_PROPERTY: {
+            case OP_STRUCT: k=READ_CONST(); op_struct: push(OBJ_VAL(new_struct(AS_STRING(k)))); break;
+            case OP_GET_PROPERTY: k=READ_CONST(); op_get_property: {
                 if(!IS_INSTANCE(peek(0))){ runtime_error("Only instances have properties."); return INTERPRET_RUNTIME_ERR; }
-                ObjInstance* inst=AS_INSTANCE(peek(0)); ObjString* name=READ_STRING();
+                ObjInstance* inst=AS_INSTANCE(peek(0)); ObjString* name=AS_STRING(k);
                 Value val;
                 if(table_get(inst->fields,name,&val)){ pop(); push(val); break; }
                 if(!bind_method(inst->klass,name)) return INTERPRET_RUNTIME_ERR;
                 break;
             }
-            case OP_SET_PROPERTY: {
+            case OP_SET_PROPERTY: k=READ_CONST(); op_set_property: {
                 if(!IS_INSTANCE(peek(1))){ runtime_error("Only instances have fields."); return INTERPRET_RUNTIME_ERR; }
-                ObjInstance* inst=AS_INSTANCE(peek(1)); ObjString* name=READ_STRING();
+                ObjInstance* inst=AS_INSTANCE(peek(1)); ObjString* name=AS_STRING(k);
                 table_set(inst->fields,name,peek(0));
                 Value val=pop(); pop(); push(val); break;
             }
-            case OP_METHOD: define_method(READ_STRING()); break;
-            case OP_INVOKE: {
-                ObjString* method=READ_STRING(); int argc=READ_BYTE();
+            case OP_METHOD: k=READ_CONST(); op_method: define_method(AS_STRING(k)); break;
+            case OP_INVOKE: k=READ_CONST(); op_invoke: {
+                ObjString* method=AS_STRING(k); int argc=READ_BYTE();
                 if(!invoke(method,argc)) return INTERPRET_RUNTIME_ERR;
                 frame=&lvm.frames[lvm.frame_count-1]; break;
             }
@@ -411,15 +414,45 @@ static InterpretResult run() {
                 ObjStruct* sup=AS_STRUCT(peek(1)); ObjStruct* sub=AS_STRUCT(peek(0));
                 table_add_all(sup->methods,sub->methods); pop(); break;
             }
-            case OP_GET_SUPER: {
-                ObjString* name=READ_STRING(); ObjStruct* sup=AS_STRUCT(pop());
+            case OP_GET_SUPER: k=READ_CONST(); op_get_super: {
+                ObjString* name=AS_STRING(k); ObjStruct* sup=AS_STRUCT(pop());
                 if(!bind_method(sup,name)) return INTERPRET_RUNTIME_ERR;
                 break;
             }
-            case OP_SUPER_INVOKE: {
-                ObjString* method=READ_STRING(); int argc=READ_BYTE(); ObjStruct* sup=AS_STRUCT(pop());
+            case OP_SUPER_INVOKE: k=READ_CONST(); op_super_invoke: {
+                ObjString* method=AS_STRING(k); int argc=READ_BYTE(); ObjStruct* sup=AS_STRUCT(pop());
                 if(!invoke_from_class(sup,method,argc)) return INTERPRET_RUNTIME_ERR;
                 frame=&lvm.frames[lvm.frame_count-1]; break;
+            }
+            case OP_APPEND_ARRAY: {
+                int n = READ_BYTE();
+                ObjArray* array = AS_ARRAY(peek(n));
+                for (int i = 0; i < n; i++) {
+                    write_value_array(&array->items, peek(n - 1 - i));  // peek(n-1) = first element
+                }
+                lvm.stack_top -= n;                   // drop the elements, keep the array
+                break;
+            }
+            case OP_WIDE: {
+                u8 op=READ_BYTE();
+                k=frame->closure->function->chunk.constants.values[READ_24()];
+                switch(op){
+                    case OP_CONST:          goto op_const;
+                    case OP_DEFINE_GLOBAL:  goto op_define_global;
+                    case OP_GET_GLOBAL:     goto op_get_global;
+                    case OP_SET_GLOBAL:     goto op_set_global;
+                    case OP_CLOSURE:        goto op_closure;
+                    case OP_STRUCT:         goto op_struct;
+                    case OP_GET_PROPERTY:   goto op_get_property;
+                    case OP_SET_PROPERTY:   goto op_set_property;
+                    case OP_METHOD:         goto op_method;
+                    case OP_INVOKE:         goto op_invoke;
+                    case OP_GET_SUPER:      goto op_get_super;
+                    case OP_SUPER_INVOKE:   goto op_super_invoke;
+                    default:
+                        fprintf(stderr,"Unknown wide opcode: %d\n",op);
+                        return INTERPRET_RUNTIME_ERR;
+                }
             }
             default:
                 fprintf(stderr,"Unknown opcode: %d\n",*(frame->ip-1));
@@ -428,6 +461,7 @@ static InterpretResult run() {
     }
 #undef READ_BYTE
 #undef READ_SHORT
+#undef READ_24
 #undef READ_CONST
 #undef READ_STRING
 #undef BINARY_OP

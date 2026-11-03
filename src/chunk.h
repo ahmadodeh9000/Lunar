@@ -27,6 +27,8 @@ typedef enum {
     OP_INHERIT,
     OP_GET_SUPER, OP_SUPER_INVOKE,
     OP_BUILD_ARRAY, OP_GET_INDEX, OP_SET_INDEX,
+    OP_APPEND_ARRAY,
+    OP_WIDE,        // prefix: the next opcode's constant index is 3 bytes, not 1
 } OpCode;
 
 typedef struct {

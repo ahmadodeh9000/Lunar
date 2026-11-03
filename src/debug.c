@@ -52,6 +52,53 @@ static i32 closure_instruction(Chunk* chunk, i32 offset) {
     return offset;
 }
 
+static const char* wide_name(u8 op) {
+    switch (op) {
+        case OP_CONST:         return "OP_CONST";
+        case OP_DEFINE_GLOBAL: return "OP_DEFINE_GLOBAL";
+        case OP_GET_GLOBAL:    return "OP_GET_GLOBAL";
+        case OP_SET_GLOBAL:    return "OP_SET_GLOBAL";
+        case OP_CLOSURE:       return "OP_CLOSURE";
+        case OP_STRUCT:        return "OP_STRUCT";
+        case OP_GET_PROPERTY:  return "OP_GET_PROPERTY";
+        case OP_SET_PROPERTY:  return "OP_SET_PROPERTY";
+        case OP_METHOD:        return "OP_METHOD";
+        case OP_INVOKE:        return "OP_INVOKE";
+        case OP_GET_SUPER:     return "OP_GET_SUPER";
+        case OP_SUPER_INVOKE:  return "OP_SUPER_INVOKE";
+        default:               return NULL;
+    }
+}
+
+// OP_WIDE <op> <3-byte index> <op's other operands>
+static i32 wide_instruction(Chunk* chunk, i32 offset) {
+    u8 op = chunk->code[offset + 1];
+    const char* name = wide_name(op);
+    if (name == NULL) {
+        printf("OP_WIDE with unknown opcode %d\n", op);
+        return offset + 2;
+    }
+    i32 c = (chunk->code[offset+2] << 16) | (chunk->code[offset+3] << 8) | chunk->code[offset+4];
+    printf("OP_WIDE %-12s %4d '", name, c);
+    printValue(chunk->constants.values[c]);
+    offset += 5;
+    if (op == OP_INVOKE || op == OP_SUPER_INVOKE) {
+        printf("' (%d args)\n", chunk->code[offset]);
+        return offset + 1;
+    }
+    printf("'\n");
+    if (op == OP_CLOSURE) {
+        ObjFunction* fn = AS_FUNCTION(chunk->constants.values[c]);
+        for (int j = 0; j < fn->upvalue_count; j++) {
+            int is_local = chunk->code[offset++];
+            int index    = chunk->code[offset++];
+            printf("%04d    |                         %s %d\n",
+                   offset - 2, is_local ? "local" : "upvalue", index);
+        }
+    }
+    return offset;
+}
+
 void disassemble_chunk(Chunk* chunk, const char* name) {
     printf("\n== %s ==\n", name);
     for (i32 off = 0; off < chunk->count;)
@@ -115,6 +162,8 @@ i32 disassemble_instruction(Chunk* chunk, i32 offset) {
         case OP_BUILD_ARRAY:        return byte_instruction("OP_BUILD_ARRAY", chunk, offset);
         case OP_GET_INDEX:          return simple_instruction("OP_GET_INDEX", offset);
         case OP_SET_INDEX:          return simple_instruction("OP_SET_INDEX", offset);
+        case OP_APPEND_ARRAY:       return byte_instruction("OP_APPEND_ARRAY", chunk, offset);
+        case OP_WIDE:               return wide_instruction(chunk, offset);
         default:
             printf("Unknown opcode %d\n", instr);
             return offset + 1;
