@@ -5,7 +5,7 @@ Lunar is a small, friendly language for games, tools, and scripts. Each mileston
 ## Phase 1–2: core features and modules
 
 - [x] **M1** `break` / `continue`
-- [ ] **M2** Remove the 256-constant and 255-element array literal limits
+- [x] **M2** Remove the 256-constant and 255-element array literal limits
 - [ ] **M3** Maps: `{ "key": value }`, `m["key"]`, `has` / `keys` / `remove` / `len`
 - [ ] **M4** `for x in collection`
 - [ ] **M5** Errors: `throw`, `try` / `catch`, built-ins throw on bad arguments

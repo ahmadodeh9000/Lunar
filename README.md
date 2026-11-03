@@ -261,7 +261,6 @@ print map([1, 2, 3], square);   // [1, 4, 9]
 - **Equality is by reference.** `[1] == [1]` is `false`; `a == b` above is `true`.
 - **Indexes must be whole numbers within bounds.** `a[-1]`, `a[1.5]`, and `a[len(a)]` are runtime errors. Setting an index never grows the array; use `push`.
 - **Only arrays can be indexed.** Indexing anything else is a runtime error, as is a non-number index.
-- **A literal holds at most 255 elements.** Build larger arrays with `push`.
 - **Printing.** `print` shows elements in brackets, with strings unquoted: `[1, a, nil]`.
 
 ---
@@ -843,7 +842,6 @@ Notes:
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
 - No file or stdin I/O, and no module system
 - A runtime error aborts the script; there is no error handling
-- Each function (and the top-level script) can reference at most 256 distinct constants. At the top level this includes the name of every global referenced and two entries per function, so a large program may need to live inside one function
 - `print` on an array that contains itself recurses without end
 - Arrays can't be passed to FFI functions yet
 
