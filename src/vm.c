@@ -233,7 +233,6 @@ static InterpretResult run() {
 #define READ_SHORT()  (frame->ip+=2,(u16)((frame->ip[-2]<<8)|frame->ip[-1]))
 #define READ_24()     (frame->ip+=3,(u32)((frame->ip[-3]<<16)|(frame->ip[-2]<<8)|frame->ip[-1]))
 #define READ_CONST()  (frame->closure->function->chunk.constants.values[READ_BYTE()])
-#define READ_STRING() AS_STRING(READ_CONST())
 
 #define BINARY_OP(vtype,op) do{ \
     if(!IS_NUMBER(peek(0))||!IS_NUMBER(peek(1))){ runtime_error("Operands must be numbers."); return INTERPRET_RUNTIME_ERR; } \
@@ -463,7 +462,6 @@ static InterpretResult run() {
 #undef READ_SHORT
 #undef READ_24
 #undef READ_CONST
-#undef READ_STRING
 #undef BINARY_OP
 #undef BINARY_BITWISE_OP
 }
