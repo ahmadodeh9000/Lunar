@@ -20,4 +20,5 @@ Known issues and ideas that are not part of a milestone yet.
 
 - Number literals with an exponent (`1e3`) don't parse.
 - Hash-based constant dedup in the compiler. `make_const` scans linearly, so compiling 100k constants takes 6.4 s (20k: 0.26 s).
+- Friendlier error when a map literal starts a statement, e.g. `{ "a": 1 };`. Today it reports `Expect ';' after expression.`; it should say "A map literal can't start a statement; wrap it in parentheses."
 - `define_native` assumes an empty VM stack (it uses slots 0 and 1). Fix it when built-in modules arrive.
