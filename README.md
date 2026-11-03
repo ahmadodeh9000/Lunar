@@ -230,11 +230,13 @@ print len(stack);       // 1
 ```lunar
 let total = 0;
 let xs = [5, 10, 15];
-for (let i = 0; i < len(xs); i = i + 1) {
-    total = total + xs[i];
+for (x in xs) {
+    total = total + x;
 }
 print total;            // 30
 ```
+
+Use `for (i, x in xs)` when you need the index too; see [for-in](#control-flow).
 
 Arrays work with functions, closures, and struct fields like any other value:
 
@@ -368,6 +370,26 @@ for (let i = 0; i < 10; i = i + 1) {
 - Both work in `while` and `for`, and only affect the innermost loop. There are no labels.
 - Using either outside a loop is a compile error, and so is using one inside a function to leave a loop around that function.
 - `break` and `continue` are reserved words.
+
+**for-in**
+
+`for (x in collection)` walks an array's values, a map's keys, or a string's characters. With two variables it gives an array's index and value, or a map's key and value:
+
+```lunar
+for (x in [10, 20]) print x;                   // 10, 20
+for (k in { hp: 10, mp: 5 }) print k;          // hp, mp
+for (c in "hé!") print c;                      // h, é, !
+
+for (i, x in ["a", "b"]) print str(i) + x;     // 0a, 1b
+for (k, v in { hp: 10 }) print k + " " + str(v);   // hp 10
+```
+
+- Each iteration gets fresh loop variables, so a closure made in the body keeps that iteration's value. Assigning to a loop variable doesn't change the loop.
+- The collection is evaluated once. `break` and `continue` work as usual.
+- **Arrays** are walked live: elements pushed during the loop are visited, and popping ends it sooner.
+- **Maps** are walked over the keys they had when the loop started, in insertion order. A key removed during the loop is skipped; keys added during the loop are not visited. In the two-variable form each value is read when its key comes up.
+- **Strings** are walked by UTF-8 character, so `"é"` is one step even though `len("é")` is 2 (`len` counts bytes). A malformed byte comes out on its own. The two-variable form isn't supported on strings yet.
+- Looping over anything else is a runtime error. `in` is a reserved word.
 
 ---
 
@@ -905,7 +927,6 @@ Notes:
 
 ## Known Limitations
 
-- No `for x in array`
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
 - No file or stdin I/O, and no module system
 - A runtime error aborts the script; there is no error handling
