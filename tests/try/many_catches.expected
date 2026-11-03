@@ -1,0 +1,6 @@
+1e+06
+200000
+200000
+stack intact
+-- stderr --
+-- exit 0 --

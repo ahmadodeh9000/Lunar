@@ -1,0 +1,21 @@
+// One million caught errors. Catching resumes run() from a loop in C, not by
+// recursion, so the C stack stays flat (ASan would report a stack overflow otherwise).
+fn fail(n) { throw n; }
+let caught = 0;
+for (let i = 0; i < 1000000; i = i + 1) {
+    try { fail(i); } catch (e) { caught = caught + 1; }
+}
+print caught;
+
+// runtime errors from the VM and from a built-in, also through a call
+fn bad_index(a) { ret a[5]; }
+let vm_errors = 0;
+let builtin_errors = 0;
+for (let i = 0; i < 200000; i = i + 1) {
+    try { bad_index([]); } catch (e) { vm_errors = vm_errors + 1; }
+    try { sqrt("x"); } catch (e) { builtin_errors = builtin_errors + 1; }
+}
+print vm_errors;
+print builtin_errors;
+let after = "stack intact";
+print after;
