@@ -19,4 +19,5 @@ Lunar is a small, friendly language for games, tools, and scripts. Each mileston
 Known issues and ideas that are not part of a milestone yet.
 
 - Number literals with an exponent (`1e3`) don't parse.
+- Hash-based constant dedup in the compiler. `make_const` scans linearly, so compiling 100k constants takes 6.4 s (20k: 0.26 s).
 - `define_native` assumes an empty VM stack (it uses slots 0 and 1). Fix it when built-in modules arrive.
