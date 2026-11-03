@@ -1,0 +1,41 @@
+// Structs, fields, methods, init, inheritance, super, bound methods.
+struct Point {
+    init(x, y) { self.x = x; self.y = y; }
+    sum() { ret self.x + self.y; }
+}
+let p = Point(3, 4);
+print p.x;
+print p.sum();
+p.z = 9;
+print p.z;
+print p;
+print Point;
+
+let m = p.sum;
+print m();
+
+struct Animal {
+    init(name) { self.name = name; }
+    speak() { print self.name; }
+    kind() { ret "animal"; }
+}
+struct Dog < Animal {
+    speak() { print "Woof!"; super.speak(); }
+}
+let d = Dog("Rex");
+d.speak();
+print d.kind();
+
+struct Empty {}
+let e = Empty();
+print e;
+
+// a field holding a function is called, not a method
+struct Box { init() { self.f = nil; } }
+let b = Box();
+fn hello() { ret "hi"; }
+b.f = hello;
+print b.f();
+
+// init returns self
+print p.init(1, 1).sum();

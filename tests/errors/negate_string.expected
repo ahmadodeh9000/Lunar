@@ -1,0 +1,4 @@
+-- stderr --
+Operand must be a number.
+[line 1] in script
+-- exit 100 --

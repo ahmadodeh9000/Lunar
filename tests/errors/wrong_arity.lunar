@@ -1,0 +1,3 @@
+fn f(a) { ret a; }
+fn g() { ret f(1, 2); }
+g();

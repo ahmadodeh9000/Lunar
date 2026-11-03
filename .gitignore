@@ -3,3 +3,6 @@ lunar
 lunar_debug
 lunar_gcstress
 recordings/*.mov
+lunar_gcstress_quiet
+lunar_asan
+*.dSYM/

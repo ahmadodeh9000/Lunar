@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at 'self': Can't use 'self' outside of a struct.
+-- exit 110 --

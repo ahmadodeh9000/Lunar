@@ -1,0 +1,4 @@
+-- stderr --
+Array index 1.5 out of bounds (length 2).
+[line 2] in script
+-- exit 100 --

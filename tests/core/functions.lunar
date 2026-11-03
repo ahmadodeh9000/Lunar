@@ -1,0 +1,57 @@
+// Functions, recursion, closures, upvalues.
+fn add(a, b) { ret a + b; }
+print add(3, 4);
+
+fn nothing() {}
+print nothing();
+
+fn fib(n) { if (n <= 1) ret n; ret fib(n - 1) + fib(n - 2); }
+print fib(15);
+
+fn apply(f, x) { ret f(x); }
+fn double(n) { ret n * 2; }
+print apply(double, 5);
+print add;
+print clock;
+
+fn make_counter() {
+    let count = 0;
+    fn inc() { count = count + 1; ret count; }
+    ret inc;
+}
+let c = make_counter();
+c(); c();
+print c();
+let c2 = make_counter();
+print c2();
+
+fn outer() {
+    let a = 1;
+    fn middle() {
+        let b = 2;
+        fn inner() { ret a + b; }
+        ret inner;
+    }
+    ret middle;
+}
+print outer()()();
+
+// two closures share one captured variable
+fn pair() {
+    let v = 0;
+    fn set(x) { v = x; }
+    fn get() { ret v; }
+    ret [set, get];
+}
+let p = pair();
+p[0](42);
+print p[1]();
+
+// a captured variable outlives its block
+let saved;
+{
+    let local = "kept";
+    fn keep() { ret local; }
+    saved = keep;
+}
+print saved();

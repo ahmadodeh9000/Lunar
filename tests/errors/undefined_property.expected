@@ -1,0 +1,4 @@
+-- stderr --
+Undefined property 'nope'.
+[line 2] in script
+-- exit 100 --

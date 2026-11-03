@@ -1,0 +1,42 @@
+// if / else, while, for, nested scopes and shadowing.
+let x = 0;
+if (x > 0) print "positive"; else if (x < 0) print "negative"; else print "zero";
+
+let i = 0;
+while (i < 3) { print i; i = i + 1; }
+
+for (let j = 0; j < 3; j = j + 1) print j * 10;
+
+let total = 0;
+for (let a = 0; a < 4; a = a + 1) {
+    for (let b = 0; b < 4; b = b + 1) {
+        if (a == b) total = total + 1;
+    }
+}
+print total;
+
+// for without initializer / increment
+let k = 0;
+for (; k < 2;) { k = k + 1; }
+print k;
+
+// shadowing in nested blocks
+let s = "global";
+{
+    let s = "outer";
+    {
+        let s = "inner";
+        print s;
+    }
+    print s;
+}
+print s;
+
+// closures made in a C-style for loop share one loop variable
+let fns = [];
+for (let n = 0; n < 3; n = n + 1) {
+    fn get() { ret n; }
+    push(fns, get);
+}
+print fns[0]();
+print fns[2]();

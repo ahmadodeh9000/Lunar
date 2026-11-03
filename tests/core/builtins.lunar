@@ -1,0 +1,25 @@
+// Built-in functions, including today's nil-on-bad-arguments behavior.
+print sqrt(16);
+print abs(-3);
+print floor(2.7);
+print ceil(2.1);
+print min(2, -3);
+print max(2, -3);
+print pow(2, 10);
+print str(42);
+print str(true);
+print str(nil);
+print str("s");
+print len("hello");
+print hex("ff");
+let r = random(1, 6);
+print r >= 1 && r <= 6 && r == floor(r);
+print random(5, 5);
+print clock() >= 0;
+print sqrt("x");
+print len(5);
+print len();
+print push(1, 2);
+print pop("x");
+print str(clock);
+print min(1);

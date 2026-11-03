@@ -1,0 +1,4 @@
+-- stderr --
+Undefined variable 'missing'.
+[line 1] in script
+-- exit 100 --

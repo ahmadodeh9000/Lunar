@@ -1,0 +1,25 @@
+4
+3
+2
+3
+-3
+2
+1024
+42
+true
+nil
+s
+5
+255
+true
+5
+true
+nil
+nil
+nil
+nil
+nil
+nil
+nil
+-- stderr --
+-- exit 0 --

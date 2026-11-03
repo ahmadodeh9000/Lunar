@@ -1,0 +1,34 @@
+// Array literals, indexing, assignment, nesting, push/pop/len, str, references.
+let empty = [];
+print empty;
+let nums = [10, 20, 30];
+print nums[0];
+print nums[1 + 1];
+nums[0] = 99;
+print nums;
+nums[0] = nums[1] = 7;
+print nums;
+print [1, 2, 3,];
+print [1, "two", nil, true, [5, 6]];
+
+let grid = [[1, 2], [3, 4]];
+print grid[1][0];
+grid[0][1] = 20;
+print grid;
+
+let stack = [];
+push(stack, 1);
+push(push(stack, 2), 3);
+print stack;
+print pop(stack);
+print len(stack);
+print pop([]);
+
+let a = [1, 2];
+let b = a;
+b[0] = 100;
+print a;
+print a == b;
+print [1] == [1];
+print str([1, "a", [nil]]);
+print len([]);

@@ -1,0 +1,14 @@
+3
+7
+9
+<instance of Point>
+<struct Point>
+7
+Woof!
+Rex
+animal
+<instance of Empty>
+hi
+2
+-- stderr --
+-- exit 0 --

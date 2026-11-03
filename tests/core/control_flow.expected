@@ -1,0 +1,16 @@
+zero
+0
+1
+2
+0
+10
+20
+4
+2
+inner
+outer
+global
+3
+3
+-- stderr --
+-- exit 0 --

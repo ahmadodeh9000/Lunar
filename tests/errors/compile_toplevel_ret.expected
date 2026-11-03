@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at 'ret': Can't return from top-level code.
+-- exit 110 --

@@ -1,0 +1,5 @@
+before
+-- stderr --
+Undefined variable 'undefined_name'.
+[line 2] in script
+-- exit 100 --

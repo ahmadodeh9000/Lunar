@@ -1,0 +1,5 @@
+1
+-- stderr --
+Invalid hexadecimal string.
+[line 2] in script
+-- exit 100 --

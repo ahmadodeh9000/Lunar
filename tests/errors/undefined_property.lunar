@@ -1,0 +1,2 @@
+struct S {}
+print S().nope;

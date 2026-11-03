@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at 'A': A struct can't inherit from itself.
+-- exit 110 --

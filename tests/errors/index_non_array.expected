@@ -1,0 +1,4 @@
+-- stderr --
+Only arrays can be indexed.
+[line 1] in script
+-- exit 100 --

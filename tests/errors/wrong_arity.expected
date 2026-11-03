@@ -1,0 +1,5 @@
+-- stderr --
+Expected 1 arguments but got 2.
+[line 2] in g()
+[line 3] in script
+-- exit 100 --
