@@ -292,6 +292,20 @@ for (let i = 0; i < 5; i = i + 1) {
 }
 ```
 
+`break` leaves the innermost loop, and `continue` skips to its next iteration. In a `for` loop, `continue` still runs the increment:
+
+```lunar
+for (let i = 0; i < 10; i = i + 1) {
+    if (i == 5) break;      // stop at 5
+    if (i % 2 == 0) continue;
+    print i;                // 1, then 3
+}
+```
+
+- Both work in `while` and `for`, and only affect the innermost loop. There are no labels.
+- Using either outside a loop is a compile error, and so is using one inside a function to leave a loop around that function.
+- `break` and `continue` are reserved words.
+
 ---
 
 ### Functions
@@ -825,7 +839,7 @@ Notes:
 
 ## Known Limitations
 
-- No `break` / `continue`, no `for x in array`, and no hash maps
+- No `for x in array`, and no hash maps
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
 - No file or stdin I/O, and no module system
 - A runtime error aborts the script; there is no error handling
