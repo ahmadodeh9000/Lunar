@@ -1,0 +1,10 @@
+// Many interpolated strings built in a loop (also run under GC stress).
+let total = 0;
+let keep = [];
+for (let i = 0; i < 2000; i = i + 1) {
+    let s = "item {i}: {[i, i * 2]} {{ id: i }}";
+    total = total + len(s);
+    if (i % 500 == 0) push(keep, s);
+}
+print total;
+print keep;

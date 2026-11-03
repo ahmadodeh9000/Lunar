@@ -479,8 +479,85 @@ static void number(bool can_assign) {
     emit_const(NUMBER_VAL(val));
 }
 
+// The text between a string token's delimiters, with its escapes decoded:
+// \n \t \" \\ and \{ (a literal brace). Anything else after a '\' is an error.
+static Value string_piece(Token* tok) {
+    const char* src = tok->start + 1;
+    int length      = tok->length - 2;
+    char* buf = (char*)malloc((size_t)length + 1);
+    if (buf == NULL) { fprintf(stderr, "OOM string\n"); exit(1); }
+    int out = 0;
+    for (int i = 0; i < length; i++) {
+        char c = src[i];
+        if (c != '\\') { buf[out++] = c; continue; }
+        char e = src[++i];
+        switch (e) {
+            case 'n':  buf[out++] = '\n'; break;
+            case 't':  buf[out++] = '\t'; break;
+            case '"':  buf[out++] = '"';  break;
+            case '\\': buf[out++] = '\\'; break;
+            case '{':  buf[out++] = '{';  break;
+            default: {
+                static char msg[80];
+                if ((unsigned char)e < ' ') snprintf(msg, sizeof msg, "Unknown escape sequence.");
+                else snprintf(msg, sizeof msg, "Unknown escape sequence '\\%c'%s.", e,
+                              e == '}' ? " (a '}' needs no escape)" : "");
+                error(msg);
+                break;
+            }
+        }
+    }
+    ObjString* str = copy_str(buf, out);
+    free(buf);
+    return OBJ_VAL(str);
+}
+
 static void string_(bool can_assign) {
-    emit_const(OBJ_VAL(copy_str(parser.prev.start + 1, parser.prev.length - 2)));
+    emit_const(string_piece(&parser.prev));
+}
+
+// a string token that continues an interpolated string, after an expression's '}'
+static bool check_continuation(TokenType type) {
+    return check(type) && parser.curr.start[0] == '}';
+}
+
+// counts one more value for OP_BUILD_STRING, joining them early every 255
+static void add_string_part(int* parts) {
+    if (++*parts == UINT8_MAX) {
+        emit_bytes(OP_BUILD_STRING, UINT8_MAX);
+        *parts = 1;                 // the joined string is the first part of the next batch
+    }
+}
+
+// "a {x} b {y} c": the scanner hands over "a {, then x's tokens, then } b {, then
+// y's tokens, then } c". Each piece and each value is pushed, then OP_BUILD_STRING
+// joins them, turning values into text the way print does.
+static void interpolation(bool can_assign) {
+    int parts = 0;
+    for (;;) {
+        if (parser.prev.length > 2) {
+            emit_const(string_piece(&parser.prev));
+            add_string_part(&parts);
+        }
+        if ((check(TOKEN_STRING) || check(TOKEN_INTERPOLATION)) && parser.curr.start[0] == '}') {
+            error_at_current("Expect an expression inside '{}' (use \\{ for a literal brace).");
+            return;
+        }
+        expression();
+        add_string_part(&parts);
+        if (!check_continuation(TOKEN_INTERPOLATION)) break;
+        advance();
+    }
+    if (!check_continuation(TOKEN_STRING)) {
+        error_at_current("Expect '}' after interpolation expression.");
+        return;
+    }
+    advance();
+    if (parser.prev.length > 2) {
+        emit_const(string_piece(&parser.prev));
+        add_string_part(&parts);
+    }
+    emit_bytes(OP_BUILD_STRING, (u8)parts);
 }
 
 static void literal(bool can_assign) {
@@ -735,6 +812,7 @@ ParseRule rules[] = {
     [TOKEN_COLON]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_IDENTIFIER]          = {variable,   NULL,    PREC_NONE},
     [TOKEN_STRING]              = {string_,    NULL,    PREC_NONE},
+    [TOKEN_INTERPOLATION]       = {interpolation, NULL, PREC_NONE},
     [TOKEN_NUMBER]              = {number,     NULL,    PREC_NONE},
     [TOKEN_AND]                 = {NULL,       and_,    PREC_AND},
     [TOKEN_OR]                  = {NULL,       or_,     PREC_OR},

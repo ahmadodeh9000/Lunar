@@ -1,0 +1,46 @@
+// "{expr}" puts the text print shows for any expression into a string.
+let hp = 7;
+let name = "Rex";
+print "hp: {hp}";
+print "{name}";
+print "{name} has {hp * 2} points";
+print "{hp}{hp}{hp}";
+print "start {hp}";
+print "{hp} end";
+print "{ hp }";
+print "math: {1 + 2 * 3} {10 / 4} {0.1 + 0.2} {2 ** 10}";
+print "values: {true} {false} {nil}";
+print "array: {[1, "a", [nil]]}";
+print "map: {{ k: "v", n: 1 }}";
+print "spaced map: { {a: 1} }";
+struct Point { init() { self.x = 1; } }
+fn named() {}
+print "objects: {Point()} {Point} {named} {sqrt}";
+
+// strings, indexing, calls, and maps inside the braces
+let items = ["sword", "shield"];
+let cfg = { mode: "hard", "with space": 1 };
+print "first: {items[0]}, mode: {cfg["mode"]}, {cfg["with space"]}";
+print "len: {len(items)}, upper: {str(len("abc"))}";
+fn greet(who) { ret "hello {who}"; }
+print "{greet(name)}!";
+print "nested: {"inner {name} {hp}"}";
+print "ternary-ish: {hp > 5 && "high" || "low"}";
+
+// interpolation is an expression like any other
+let s = "a{1}b";
+print s == "a1b";
+print "{1}" == "1";
+print len("{hp}{hp}");
+let m = {};
+m["key {hp}"] = "v";
+print has(m, "key 7");
+print ["{hp}", "{name}"];
+
+// across real line breaks
+print "first {hp}
+second {name}";
+
+// escapes and interpolation together
+print "\{\"name\": \"{name}\", \"hp\": {hp}}";
+print "tab\t{name}\n{hp}";

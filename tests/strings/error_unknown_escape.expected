@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at '"a \q b"': Unknown escape sequence '\q'.
+-- exit 110 --

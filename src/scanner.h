@@ -25,6 +25,7 @@ typedef enum {
 
     // Literals.
     TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
+    TOKEN_INTERPOLATION,    // a string piece that ends at an interpolation's '{'
 
     // Keywords.
     TOKEN_ELSE, TOKEN_FALSE,

@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR: Unterminated string.
+-- exit 110 --

@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at '"a \} b"': Unknown escape sequence '\}' (a '}' needs no escape).
+-- exit 110 --

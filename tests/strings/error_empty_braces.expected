@@ -1,0 +1,3 @@
+-- stderr --
+[line 1] ERROR at '} here"': Expect an expression inside '{}' (use \{ for a literal brace).
+-- exit 110 --

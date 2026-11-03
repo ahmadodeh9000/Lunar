@@ -2,10 +2,16 @@
 #include "common.h"
 #include <string.h>
 
+#define MAX_INTERPOLATION_DEPTH 8
+
 typedef struct {
     const char* start;
     const char* curr;
     i32 line;
+    // For each string interpolation being scanned, the '{' still open inside its
+    // expression; a '}' when that is 0 ends the expression and resumes the string.
+    i32 interpolation_depth;
+    i32 open_braces[MAX_INTERPOLATION_DEPTH];
 } Scanner;
 
 Scanner scanner;
@@ -14,6 +20,7 @@ void init_scanner(const char* src) {
     scanner.start = src;
     scanner.curr  = src;
     scanner.line  = 1;
+    scanner.interpolation_depth = 0;
 }
 
 static bool is_at_end()  { return *scanner.curr == '\0'; }
@@ -143,12 +150,29 @@ static Token number() {
     return make_token(TOKEN_NUMBER);
 }
 
+// Scans the rest of a string after its opening '"', or after the '}' that ends an
+// interpolation. Either way the token's first and last characters are delimiters:
+// a TOKEN_STRING ends with '"', a TOKEN_INTERPOLATION with '{'. Escapes are decoded
+// by the compiler; here a '\' only keeps the next character from ending anything.
 static Token string() {
-    while (peek() != '"' && !is_at_end()) {
-        if (peek() == '\n') scanner.line++;
+    for (;;) {
+        if (is_at_end()) return err_token("Unterminated string.");
+        char c = peek();
+        if (c == '"') break;
+        if (c == '\n') scanner.line++;
+        if (c == '\\') {
+            advance();
+            if (is_at_end()) return err_token("Unterminated string.");
+            if (peek() == '\n') scanner.line++;
+        } else if (c == '{') {
+            if (scanner.interpolation_depth == MAX_INTERPOLATION_DEPTH)
+                return err_token("Interpolation nested too deeply.");
+            advance();
+            scanner.open_braces[scanner.interpolation_depth++] = 0;
+            return make_token(TOKEN_INTERPOLATION);
+        }
         advance();
     }
-    if (is_at_end()) return err_token("Unterminated string.");
     advance();
     return make_token(TOKEN_STRING);
 }
@@ -163,8 +187,19 @@ Token scan_token() {
     if (is_digit(c)) return number();
 
     switch (c) {
-        case '{': return make_token(TOKEN_LEFT_BRACE);
-        case '}': return make_token(TOKEN_RIGHT_BRACE);
+        case '{':
+            if (scanner.interpolation_depth > 0) scanner.open_braces[scanner.interpolation_depth - 1]++;
+            return make_token(TOKEN_LEFT_BRACE);
+        case '}':
+            if (scanner.interpolation_depth > 0) {
+                i32* open = &scanner.open_braces[scanner.interpolation_depth - 1];
+                if (*open == 0) {               // ends the interpolation: back into the string
+                    scanner.interpolation_depth--;
+                    return string();
+                }
+                (*open)--;
+            }
+            return make_token(TOKEN_RIGHT_BRACE);
         case '(': return make_token(TOKEN_LEFT_PAREN);
         case ')': return make_token(TOKEN_RIGHT_PAREN);
         case ';': return make_token(TOKEN_SEMICOLON);

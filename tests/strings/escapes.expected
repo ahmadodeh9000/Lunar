@@ -1,0 +1,18 @@
+line one
+line two
+a	b
+she said "hi"
+back\slash
+{ a literal brace }
+true
+1
+4
+\"
+"startend"
+\
+ends with a tab	|
+{"hp": 7}
+closing } brace
+3
+-- stderr --
+-- exit 0 --

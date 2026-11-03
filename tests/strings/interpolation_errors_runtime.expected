@@ -1,0 +1,8 @@
+1 2 3
+[1, 2, 3]
+caught: Operands must be two numbers or two strings.
+caught: Undefined variable 'missing_name'.
+Array index 1 out of bounds (length 0).
+[1, 2, 3, before]
+-- stderr --
+-- exit 0 --

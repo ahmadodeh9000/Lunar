@@ -1,0 +1,3 @@
+-- stderr --
+[line 2] ERROR: Interpolation nested too deeply.
+-- exit 110 --

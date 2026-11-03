@@ -1,0 +1,9 @@
+// Errors inside an interpolation behave like any other error, and are evaluated left to right.
+let order = [];
+fn note(x) { push(order, x); ret x; }
+print "{note(1)} {note(2)} {note(3)}";
+print order;
+try { print "value: {1 + nil}"; } catch (e) { print "caught: {e}"; }
+try { print "value: {missing_name}"; } catch (e) { print "caught: {e}"; }
+try { print "a {note("before")} {[][1]} {note("never")}"; } catch (e) { print e; }
+print order;

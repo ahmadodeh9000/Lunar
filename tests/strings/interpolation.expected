@@ -1,0 +1,30 @@
+hp: 7
+Rex
+Rex has 14 points
+777
+start 7
+7 end
+7
+math: 7 2.5 0.3 1024
+values: true false nil
+array: [1, a, [nil]]
+map: {k: v, n: 1}
+spaced map: {a: 1}
+objects: <instance of Point> <struct Point> <fn named> <native fn sqrt>
+first: sword, mode: hard, 1
+len: 2, upper: 3
+hello Rex!
+nested: inner Rex 7
+ternary-ish: high
+true
+true
+2
+true
+[7, Rex]
+first 7
+second Rex
+{"name": "Rex", "hp": 7}
+tab	Rex
+7
+-- stderr --
+-- exit 0 --

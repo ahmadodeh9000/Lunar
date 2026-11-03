@@ -1,0 +1,20 @@
+// Escapes: \n \t \" \\ \{ and nothing else.
+print "line one\nline two";
+print "a\tb";
+print "she said \"hi\"";
+print "back\\slash";
+print "\{ a literal brace }";
+print "\n" == "
+";
+print len("\n");
+print len("\t\"\\\{");
+print "\\\"";
+print "\"start" + "end\"";
+print "\\";
+print "ends with a tab\t|";
+print "\{\"hp\": 7}";
+// a } never needs escaping
+print "closing } brace";
+let parts = [];
+for (c in "a\nb") push(parts, c);
+print len(parts);

@@ -252,6 +252,28 @@ static int utf8_char_length(const char* s, int remaining) {
     return n;
 }
 
+// joins n values into one string, each as the text print shows (OP_BUILD_STRING);
+// the values stay on the stack meanwhile, since allocating can GC
+static ObjString* join_parts(Value* parts, int n) {
+    char* texts[UINT8_MAX];
+    int   lens[UINT8_MAX];
+    int   total = 0;
+    for (int i = 0; i < n; i++) {
+        if (IS_STRING(parts[i])) { texts[i] = NULL; lens[i] = AS_STRING(parts[i])->length; }
+        else texts[i] = value_text(parts[i], &lens[i]);
+        total += lens[i];
+    }
+    char* buf = ALLOCATE(char, total + 1);
+    int at = 0;
+    for (int i = 0; i < n; i++) {
+        memcpy(buf + at, texts[i] != NULL ? texts[i] : AS_CSTRING(parts[i]), lens[i]);
+        at += lens[i];
+        free(texts[i]);
+    }
+    buf[total] = '\0';
+    return take_str(buf, total);
+}
+
 static bool invoke_from_class(ObjStruct* klass, ObjString* name, int argc) {
     Value method;
     if(!table_get(klass->methods,name,&method)){ runtime_error("Undefined property '%s'.",name->chars); return false; }
@@ -484,6 +506,13 @@ static InterpretResult run() {
                 break;
             }
             case OP_POP_HANDLER: lvm.handler_count--; break;
+            case OP_BUILD_STRING: {
+                int n = READ_BYTE();
+                ObjString* joined = join_parts(lvm.stack_top - n, n);
+                lvm.stack_top -= n;
+                push(OBJ_VAL(joined));
+                break;
+            }
             case OP_THROW: lvm.error_value=pop(); lvm.error_pending=true; return INTERPRET_RUNTIME_ERR;
 
             case OP_GET_INDEX: {
