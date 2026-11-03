@@ -1,0 +1,28 @@
+// for (;;) has no condition, so there is no exit pop for break to skip.
+{
+    let before = "before";
+    for (;;) { break; }
+    let after = "after";
+    print before;
+    print after;
+}
+
+let count = 0;
+for (;;) {
+    count = count + 1;
+    if (count < 5) continue;
+    break;
+}
+print count;
+
+// no condition but an increment
+let seen = 0;
+for (let x = 0;; x = x + 1) {
+    if (x == 7) break;
+    seen = seen + x;
+}
+print seen;
+
+// globals only, no locals at all
+for (;;) break;
+print "done";

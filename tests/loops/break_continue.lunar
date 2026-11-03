@@ -1,0 +1,38 @@
+// break and continue in while and for loops.
+let i = 0;
+while (true) {
+    if (i == 3) break;
+    print i;
+    i = i + 1;
+}
+print "while break done";
+
+i = 0;
+while (i < 5) {
+    i = i + 1;
+    if (i % 2 == 0) continue;
+    print i;
+}
+
+// continue in a for loop still runs the increment
+for (let j = 0; j < 5; j = j + 1) {
+    if (j == 1 || j == 3) continue;
+    print j * 10;
+}
+
+for (let j = 0; j < 100; j = j + 1) {
+    if (j == 2) break;
+    print j;
+}
+
+// a statement without braces
+let n = 0;
+while (true) if ((n = n + 1) > 4) break;
+print n;
+
+// break and continue as the last statement of the body
+let k = 0;
+while (k < 3) { k = k + 1; continue; }
+print k;
+while (true) { break; }
+print "end";

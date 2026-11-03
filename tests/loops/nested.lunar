@@ -1,0 +1,55 @@
+// break and continue only affect the innermost loop.
+for (let i = 0; i < 3; i = i + 1) {
+    for (let j = 0; j < 3; j = j + 1) {
+        if (j == 1) continue;
+        if (j == 2) break;
+        print str(i) + "," + str(j);
+    }
+    if (i == 1) break;
+}
+
+let i = 0;
+while (i < 3) {
+    i = i + 1;
+    let j = 0;
+    while (true) {
+        j = j + 1;
+        if (j > i) break;
+    }
+    print j;
+}
+
+// break inside a function's loop, then ret
+fn find(arr, want) {
+    let found = -1;
+    for (let k = 0; k < len(arr); k = k + 1) {
+        if (arr[k] == want) { found = k; break; }
+    }
+    ret found;
+}
+print find([5, 6, 7], 6);
+print find([5, 6, 7], 9);
+
+// ret from inside a loop still works
+fn first_even(arr) {
+    let k = 0;
+    while (k < len(arr)) {
+        if (arr[k] % 2 == 0) ret arr[k];
+        k = k + 1;
+    }
+    ret nil;
+}
+print first_even([1, 3, 8, 10]);
+
+// a loop inside a method
+struct Counter {
+    init() { self.n = 0; }
+    run() {
+        while (true) {
+            self.n = self.n + 1;
+            if (self.n == 4) break;
+        }
+        ret self.n;
+    }
+}
+print Counter().run();

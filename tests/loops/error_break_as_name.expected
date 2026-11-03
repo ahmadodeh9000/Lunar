@@ -1,0 +1,4 @@
+-- stderr --
+[line 1] ERROR at 'break': Expect variable name.
+[line 1] ERROR at 'break': Can't use 'break' outside of a loop.
+-- exit 110 --

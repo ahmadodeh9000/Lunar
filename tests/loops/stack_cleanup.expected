@@ -1,0 +1,11 @@
+outer
+after
+outer
+after2
+outer
+after3
+outer+after+after2+after3
+50000
+100000
+-- stderr --
+-- exit 0 --

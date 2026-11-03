@@ -79,6 +79,15 @@ typedef enum {
 #define MAX_LOCALS   256
 #define MAX_UPVALUES 256
 
+typedef struct Loop {
+    struct Loop* enclosing;
+    int  start;             // where 'continue' jumps to
+    int  scope_depth;       // locals deeper than this belong to the loop body
+    int* breaks;            // 'break' jumps, patched when the loop ends
+    int  break_count;
+    int  break_capacity;
+} Loop;
+
 typedef struct Compiler {
     struct Compiler* enclosing;
 
@@ -89,6 +98,7 @@ typedef struct Compiler {
     int     local_count;
     Upvalue upvalues[MAX_UPVALUES];
     int     scope_depth;
+    Loop*   loop;           // innermost loop, NULL outside loops
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -250,6 +260,7 @@ static void init_compiler(Compiler* compiler, FunctionType type) {
     compiler->type        = type;
     compiler->local_count = 0;
     compiler->scope_depth = 0;
+    compiler->loop        = NULL;
     compiler->function    = new_function();
     current               = compiler;
 
@@ -302,6 +313,35 @@ static void end_scope() {
             emit_byte(OP_POP);
         }
         current->local_count--;
+    }
+}
+
+/* ── Loops (break / continue) ── */
+
+static void begin_loop(Loop* loop, int start) {
+    loop->enclosing      = current->loop;
+    loop->start          = start;
+    loop->scope_depth    = current->scope_depth;
+    loop->breaks         = NULL;
+    loop->break_count    = 0;
+    loop->break_capacity = 0;
+    current->loop        = loop;
+}
+
+// patches every 'break' of the innermost loop to jump here
+static void end_loop() {
+    Loop* loop = current->loop;
+    for (int i = 0; i < loop->break_count; i++) patch_jump(loop->breaks[i]);
+    free(loop->breaks);
+    current->loop = loop->enclosing;
+}
+
+// pops the loop body's locals without forgetting them: code after the jump still uses them
+static void discard_loop_locals() {
+    for (int i = current->local_count - 1;
+         i >= 0 && current->locals[i].depth > current->loop->scope_depth; i--)
+    {
+        emit_byte(current->locals[i].is_captured ? OP_CLOSE_UPVALUE : OP_POP);
     }
 }
 
@@ -662,6 +702,8 @@ ParseRule rules[] = {
     [TOKEN_TRUE]                = {literal,    NULL,    PREC_NONE},
     [TOKEN_LET]                 = {NULL,       NULL,    PREC_NONE},
     [TOKEN_WHILE]               = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_BREAK]               = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_CONTINUE]            = {NULL,       NULL,    PREC_NONE},
     [TOKEN_ERROR]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_EOF]                 = {NULL,       NULL,    PREC_NONE},
 };
@@ -737,11 +779,15 @@ static void while_statement() {
 
     int exit_jump = emit_jump(OP_JUMP_IF_FALSE);
     emit_byte(OP_POP);
+
+    Loop loop;
+    begin_loop(&loop, loop_start);
     statement();
     emit_loop(loop_start);
 
     patch_jump(exit_jump);
     emit_byte(OP_POP);
+    end_loop();     // after the condition's pop: a break has no condition on the stack
 }
 
 static void for_statement() {
@@ -785,6 +831,9 @@ static void for_statement() {
         patch_jump(body_jump);
     }
 
+    // the loop variable lives in the scope begun above, so break leaves it to end_scope
+    Loop loop;
+    begin_loop(&loop, loop_start);
     statement();
     emit_loop(loop_start);
 
@@ -792,8 +841,33 @@ static void for_statement() {
         patch_jump(exit_jump);
         emit_byte(OP_POP);
     }
+    end_loop();     // after the condition's pop, if there is one
 
     end_scope();
+}
+
+static void break_statement() {
+    if (current->loop == NULL) error("Can't use 'break' outside of a loop.");
+    consume(TOKEN_SEMICOLON, "Expect ';' after 'break'.");
+    if (current->loop == NULL) return;
+
+    discard_loop_locals();
+    Loop* loop = current->loop;
+    if (loop->break_count == loop->break_capacity) {
+        loop->break_capacity = loop->break_capacity < 8 ? 8 : 2 * loop->break_capacity;
+        loop->breaks = (int*)realloc(loop->breaks, sizeof(int) * loop->break_capacity);
+        if (!loop->breaks) { fprintf(stderr,"OOM break\n"); exit(1); }
+    }
+    loop->breaks[loop->break_count++] = emit_jump(OP_JUMP);
+}
+
+static void continue_statement() {
+    if (current->loop == NULL) error("Can't use 'continue' outside of a loop.");
+    consume(TOKEN_SEMICOLON, "Expect ';' after 'continue'.");
+    if (current->loop == NULL) return;
+
+    discard_loop_locals();
+    emit_loop(current->loop->start);
 }
 
 static void return_statement() {
@@ -821,6 +895,10 @@ static void statement() {
         for_statement();
     } else if (match(TOKEN_RET)) {
         return_statement();
+    } else if (match(TOKEN_BREAK)) {
+        break_statement();
+    } else if (match(TOKEN_CONTINUE)) {
+        continue_statement();
     } else if (match(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block();
@@ -946,6 +1024,7 @@ static void synchronize() {
             case TOKEN_STRUCT: case TOKEN_FN: case TOKEN_LET:
             case TOKEN_FOR: case TOKEN_IF: case TOKEN_WHILE:
             case TOKEN_PRINT: case TOKEN_RET:
+            case TOKEN_BREAK: case TOKEN_CONTINUE:
                 return;
             default:;
         }

@@ -1,0 +1,61 @@
+// Jumping out of nested blocks pops exactly the loop body's locals.
+// If too few or too many were popped, later locals would land in the wrong slots.
+fn check() {
+    let outer = "outer";
+    for (let i = 0; i < 10; i = i + 1) {
+        let a = 1;
+        let b = 2;
+        break;
+    }
+    let after = "after";
+    print outer;
+    print after;
+
+    for (let i = 0; i < 3; i = i + 1) {
+        let a = "a";
+        {
+            let b = "b";
+            {
+                let c = "c";
+                if (i == 1) continue;
+                if (i == 2) break;
+            }
+        }
+    }
+    let after2 = "after2";
+    print outer;
+    print after2;
+
+    let w = 0;
+    while (w < 3) {
+        let x = w;
+        let y = x * 2;
+        w = w + 1;
+        if (y == 2) continue;
+    }
+    let after3 = "after3";
+    print outer;
+    print after3;
+    ret outer + "+" + after + "+" + after2 + "+" + after3;
+}
+print check();
+
+// 100000 iterations: if continue or break leaked stack slots, this would overflow
+let total = 0;
+for (let i = 0; i < 100000; i = i + 1) {
+    let a = i;
+    let b = a + 1;
+    let c = b + 1;
+    if (i % 2 == 0) continue;
+    total = total + 1;
+}
+print total;
+
+let rounds = 0;
+while (rounds < 100000) {
+    let p = 1;
+    let q = 2;
+    rounds = rounds + 1;
+    while (true) { let r = 3; break; }
+}
+print rounds;

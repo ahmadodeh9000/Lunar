@@ -1,0 +1,3 @@
+-- stderr --
+[line 3] ERROR at 'break': Can't use 'break' outside of a loop.
+-- exit 110 --

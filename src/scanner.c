@@ -74,6 +74,8 @@ static TokenType checkKeyword(int start, int length, const char* rest, TokenType
 
 static TokenType identifier_type() {
     switch (scanner.start[0]) {
+        case 'b': return checkKeyword(1,4,"reak",TOKEN_BREAK);
+        case 'c': return checkKeyword(1,7,"ontinue",TOKEN_CONTINUE);
         case 'i': return checkKeyword(1,1,"f",TOKEN_IF);
         case 'e': return checkKeyword(1,3,"lse",TOKEN_ELSE);
         case 'l': return checkKeyword(1,2,"et",TOKEN_LET);

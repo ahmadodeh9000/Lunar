@@ -1,0 +1,50 @@
+// Locals captured by closures are closed when break or continue leaves the body.
+let saved = nil;
+for (let i = 0; i < 10; i = i + 1) {
+    let msg = "iteration " + str(i);
+    fn show() { ret msg; }
+    saved = show;
+    if (i == 2) break;
+}
+print saved();
+
+// each while iteration gets its own body local, kept across continue
+let fns = [];
+let i = 0;
+while (i < 4) {
+    let v = i * 10;
+    fn get() { ret v; }
+    push(fns, get);
+    i = i + 1;
+    if (v == 10) continue;
+}
+print fns[0]();
+print fns[1]();
+print fns[3]();
+
+// a closure created after the break in the body (never reached on the break iteration)
+let later = [];
+let n = 0;
+while (true) {
+    let x = n;
+    if (n == 2) break;
+    fn get() { ret x; }
+    push(later, get);
+    n = n + 1;
+}
+print len(later);
+print later[0]();
+print later[1]();
+
+// a captured local in an inner block, then continue
+let out = [];
+for (let k = 0; k < 3; k = k + 1) {
+    {
+        let inner = k + 100;
+        fn get() { ret inner; }
+        push(out, get);
+        continue;
+    }
+}
+print out[0]();
+print out[2]();
