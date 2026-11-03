@@ -33,6 +33,7 @@ d.speak();
 - **Arrays**: literals, nested arrays, indexing and index assignment, `push` / `pop` / `len`
 - **Maps**: insertion-ordered key/value literals, `m[k]` and `m.k` access, `has` / `keys` / `remove`
 - **Error handling**: `throw` any value, `try` / `catch` runtime and built-in errors
+- **Strings**: interpolation with `"hp: {hp}"`, and the escapes `\n` `\t` `\"` `\\` `\{`
 - **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
 - **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
 - **Foreign Function Interface**: call into native shared libraries via `libffi`
@@ -178,6 +179,39 @@ let poem = "line one
 line two
 line three";
 ```
+
+**Interpolation**
+
+Put any expression in `{ }` inside a string. Its value is written the way `print` shows it:
+
+```lunar
+let name = "Rex";
+let hp = 7;
+let player = { name: name };
+print "{name} has {hp} hp";            // Rex has 7 hp
+print "double: {hp * 2}";              // double: 14
+print "items: {[1, 2]}, ok: {hp > 5}"; // items: [1, 2], ok: true
+print "first: {player["name"]}";       // strings and indexing work inside the braces
+```
+
+**Escapes**
+
+| Escape | Means |
+|--------|-------|
+| `\n`   | newline |
+| `\t`   | tab |
+| `\"`   | `"` |
+| `\\`   | `\` |
+| `\{`   | a literal `{`, so it doesn't start interpolation |
+
+Any other `\` sequence is a compile error. A `}` never needs escaping. Use `\{` when the text itself has braces, such as JSON written by hand:
+
+```lunar
+print "\{\"name\": \"{name}\", \"hp\": {hp}}";   // {"name": "Rex", "hp": 7}
+```
+
+- `"{}"` with nothing inside is a compile error.
+- Interpolation can nest, as in `"a {"b {x}"}"`, up to 8 levels.
 
 ---
 
