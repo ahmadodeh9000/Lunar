@@ -1,0 +1,4 @@
+-- stderr --
+{code: 404, path: level9.lunar}
+[line 2] in script
+-- exit 100 --

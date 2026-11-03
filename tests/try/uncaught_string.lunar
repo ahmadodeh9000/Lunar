@@ -1,0 +1,6 @@
+// An uncaught throw prints the value and a stack trace from where it was thrown.
+fn inner() { throw "boom"; }
+fn outer() { inner(); }
+print "start";
+outer();
+print "never";

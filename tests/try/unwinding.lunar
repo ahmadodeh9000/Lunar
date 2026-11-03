@@ -1,0 +1,74 @@
+// A throw unwinds through calls, methods, closures, and init to the nearest try.
+fn level3() { throw "from level3"; }
+fn level2() { let local = "l2"; level3(); print "never"; }
+fn level1() { level2(); print "never"; }
+try { level1(); } catch (e) { print e; }
+
+struct Door {
+    init(locked) {
+        if (locked) throw "locked door";
+        self.open = true;
+    }
+    knock() { throw "nobody home"; }
+}
+try { Door(true); } catch (e) { print e; }
+try { Door(false).knock(); } catch (e) { print e; }
+print Door(false).open;
+
+fn make_thrower(msg) {
+    fn t() { throw msg; }
+    ret t;
+}
+try { make_thrower("from a closure")(); } catch (e) { print e; }
+
+// a function stored in a map
+let actions = { fail: level3 };
+try { actions.fail(); } catch (e) { print e; }
+
+// the catch runs in the frame of the try, with the stack back at its height
+fn safe_div(a, b) {
+    let before = "before";
+    try {
+        if (b == 0) throw "divide by zero";
+        ret a / b;
+    } catch (e) {
+        let after = "after";
+        print before + " " + after + " " + e;
+        ret nil;
+    }
+}
+print safe_div(6, 3);
+print safe_div(1, 0);
+
+// locals declared after a caught error land in the right slots
+fn slots() {
+    let a = "a";
+    try { let x = 1; let y = 2; level1(); } catch (e) {}
+    let b = "b";
+    try { let z = [1]; print z[9]; } catch (e) {}
+    let c = "c";
+    ret a + b + c;
+}
+print slots();
+
+// closures created in frames that were unwound keep their values
+let saved = nil;
+fn capture_then_fail() {
+    let secret = "kept";
+    fn get() { ret secret; }
+    saved = get;
+    throw "unwound";
+}
+try { capture_then_fail(); } catch (e) { print e; }
+print saved();
+
+let counters = [];
+for (i in [1, 2, 3]) {
+    try {
+        let v = i * 10;
+        fn get() { ret v; }
+        push(counters, get);
+        if (i == 2) throw "skip";
+    } catch (e) { print e; }
+}
+print [counters[0](), counters[1](), counters[2]()];

@@ -1,0 +1,49 @@
+sqrt() takes 1 argument (got 0).
+abs() expects a number for argument 1 (got string).
+floor() expects a number for argument 1 (got nil).
+ceil() expects a number for argument 1 (got array).
+sin() takes 1 argument (got 2).
+cos() expects a number for argument 1 (got map).
+tan() expects a number for argument 1 (got bool).
+atan2() expects a number for argument 2 (got string).
+pow() takes 2 arguments (got 1).
+min() expects a number for argument 1 (got string).
+max() takes 2 arguments (got 3).
+len() expects a string, array, or map for argument 1 (got nil).
+push() takes 2 arguments (got 1).
+pop() expects an array for argument 1 (got map).
+nil
+hex() expects a string for argument 1 (got number).
+Invalid hexadecimal string.
+random() takes 2 arguments (got 1).
+random() expects a number for argument 1 (got string).
+false
+keys() takes 1 argument (got 2).
+nil
+str() takes 1 argument (got 0).
+str() takes 1 argument (got 2).
+<fn named>
+<struct Point>
+<instance of Point>
+<fn get>
+<native fn sqrt>
+true
+clib() expects a string for argument 1 (got number).
+clib() takes 1 argument (got 0).
+nil
+true
+cbind() takes at least 3 arguments (got 2).
+cbind() expects an FFI library for argument 1 (got string).
+cbind() expects a string for argument 2 (got number).
+cbind() doesn't know the type 'float'.
+cbind() expects a string for argument 4 (got number).
+cbind() doesn't know the type 'quad'.
+cbind() parameters can't have the type 'void'.
+nil
+5
+Function 'abs' expected 1 arguments, got 0.
+'abs' expected a number for argument 1.
+'strlen' expected a string for argument 1.
+4
+-- stderr --
+-- exit 0 --

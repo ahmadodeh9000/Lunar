@@ -83,6 +83,7 @@ typedef struct Loop {
     struct Loop* enclosing;
     int  start;             // where 'continue' jumps to
     int  scope_depth;       // locals deeper than this belong to the loop body
+    int  try_depth;         // try blocks already running when the loop began
     int* breaks;            // 'break' jumps, patched when the loop ends
     int  break_count;
     int  break_capacity;
@@ -99,6 +100,7 @@ typedef struct Compiler {
     Upvalue upvalues[MAX_UPVALUES];
     int     scope_depth;
     Loop*   loop;           // innermost loop, NULL outside loops
+    int     try_depth;      // try blocks around the current code, in this function
 } Compiler;
 
 typedef struct ClassCompiler {
@@ -272,6 +274,7 @@ static void init_compiler(Compiler* compiler, FunctionType type) {
     compiler->local_count = 0;
     compiler->scope_depth = 0;
     compiler->loop        = NULL;
+    compiler->try_depth   = 0;
     compiler->function    = new_function();
     current               = compiler;
 
@@ -333,6 +336,7 @@ static void begin_loop(Loop* loop, int start) {
     loop->enclosing      = current->loop;
     loop->start          = start;
     loop->scope_depth    = current->scope_depth;
+    loop->try_depth      = current->try_depth;
     loop->breaks         = NULL;
     loop->break_count    = 0;
     loop->break_capacity = 0;
@@ -347,8 +351,10 @@ static void end_loop() {
     current->loop = loop->enclosing;
 }
 
-// pops the loop body's locals without forgetting them: code after the jump still uses them
+// leaves the try blocks begun inside the loop body, and pops the body's locals without
+// forgetting them: code after the jump still uses them
 static void discard_loop_locals() {
+    for (int i = current->try_depth; i > current->loop->try_depth; i--) emit_byte(OP_POP_HANDLER);
     for (int i = current->local_count - 1;
          i >= 0 && current->locals[i].depth > current->loop->scope_depth; i--)
     {
@@ -749,6 +755,9 @@ ParseRule rules[] = {
     [TOKEN_BREAK]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_CONTINUE]            = {NULL,       NULL,    PREC_NONE},
     [TOKEN_IN]                  = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_TRY]                 = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_CATCH]               = {NULL,       NULL,    PREC_NONE},
+    [TOKEN_THROW]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_ERROR]               = {NULL,       NULL,    PREC_NONE},
     [TOKEN_EOF]                 = {NULL,       NULL,    PREC_NONE},
 };
@@ -972,18 +981,59 @@ static void continue_statement() {
     emit_loop(current->loop->start);
 }
 
+// leaves every try block around a ret
+static void emit_handler_pops() {
+    for (int i = 0; i < current->try_depth; i++) emit_byte(OP_POP_HANDLER);
+}
+
 static void return_statement() {
     if (current->type == TYPE_SCRIPT) error("Can't return from top-level code.");
 
     if (match(TOKEN_SEMICOLON)) {
+        emit_handler_pops();
         emit_return();
     } else {
         if (current->type == TYPE_INITIALIZER)
             error("Can't return a value from an initializer.");
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
+        emit_handler_pops();    // after the value, so an error computing it is still caught
         emit_byte(OP_RET);
     }
+}
+
+// try { ... } catch (e) { ... }
+// OP_TRY records where the catch starts; if anything in the try block throws, the VM
+// unwinds to this frame and stack height and pushes the error into the slot of e.
+static void try_statement() {
+    int catch_jump = emit_jump(OP_TRY);
+    consume(TOKEN_LEFT_BRACE, "Expect '{' after 'try'.");
+    current->try_depth++;
+    begin_scope();
+    block();
+    end_scope();
+    current->try_depth--;
+    emit_byte(OP_POP_HANDLER);
+    int end_jump = emit_jump(OP_JUMP);
+
+    patch_jump(catch_jump);
+    consume(TOKEN_CATCH, "Expect 'catch' after try block.");
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after 'catch'.");
+    consume(TOKEN_IDENTIFIER, "Expect error variable name.");
+    begin_scope();
+    add_local(parser.prev);
+    mark_initialized();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after error variable name.");
+    consume(TOKEN_LEFT_BRACE, "Expect '{' after catch clause.");
+    block();
+    end_scope();
+    patch_jump(end_jump);
+}
+
+static void throw_statement() {
+    expression();
+    consume(TOKEN_SEMICOLON, "Expect ';' after thrown value.");
+    emit_byte(OP_THROW);
 }
 
 static void statement() {
@@ -1001,6 +1051,10 @@ static void statement() {
         break_statement();
     } else if (match(TOKEN_CONTINUE)) {
         continue_statement();
+    } else if (match(TOKEN_TRY)) {
+        try_statement();
+    } else if (match(TOKEN_THROW)) {
+        throw_statement();
     } else if (match(TOKEN_LEFT_BRACE)) {
         begin_scope();
         block();
@@ -1127,6 +1181,7 @@ static void synchronize() {
             case TOKEN_FOR: case TOKEN_IF: case TOKEN_WHILE:
             case TOKEN_PRINT: case TOKEN_RET:
             case TOKEN_BREAK: case TOKEN_CONTINUE:
+            case TOKEN_TRY: case TOKEN_THROW:
                 return;
             default:;
         }

@@ -1,0 +1,6 @@
+// After leaving try blocks with ret and break, an error is uncaught again.
+fn early() { try { ret 1; } catch (e) { print "WRONG"; } }
+early();
+for (x in [1]) { try { break; } catch (e) { print "WRONG"; } }
+print "throwing";
+throw "nobody catches this";

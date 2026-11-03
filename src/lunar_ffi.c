@@ -8,6 +8,7 @@
 #include "vm.h"
 #include "object.h"
 #include "memory.h"
+#include "lunar_std.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -50,7 +51,7 @@ static bool parse_type(ObjString* typeStr, ffi_type** ffiOut, int* lunarOut) {
    Usage in Script: let lib = clib("libc.so.6");
    ───────────────────────────────────────────────────────────-─ */
 Value ffi_load_library(int argCount, Value* args) {
-    if (argCount != 1 || !IS_STRING(args[0])) {
+    if (!check_arity("clib", argCount, 1) || !check_arg("clib", args, 0, IS_STRING(args[0]), "a string")) {
         return NIL_VAL;
     }
 
@@ -77,7 +78,13 @@ Value ffi_load_library(int argCount, Value* args) {
 
 
 Value ffi_bind_function(int argCount, Value* args) {
-    if (argCount < 3 || !IS_FFI_LIB(args[0]) || !IS_STRING(args[1]) || !IS_STRING(args[2])) {
+    if (argCount < 3) {
+        runtime_error("cbind() takes at least 3 arguments (got %d).", argCount);
+        return NIL_VAL;
+    }
+    if (!check_arg("cbind", args, 0, IS_FFI_LIB(args[0]), "an FFI library") ||
+        !check_arg("cbind", args, 1, IS_STRING(args[1]), "a string") ||
+        !check_arg("cbind", args, 2, IS_STRING(args[2]), "a string")) {
         return NIL_VAL;
     }
 
@@ -86,19 +93,12 @@ Value ffi_bind_function(int argCount, Value* args) {
     ObjString* returnTypeStr = AS_STRING(args[2]);
     int param_count = argCount - 3;
 
-    void* symbol = NULL;
-#ifdef _WIN32
-    symbol = GetProcAddress((HMODULE)lib->handle, funcName->chars);
-#else
-    symbol = dlsym(lib->handle, funcName->chars);
-#endif
-    if (!symbol) {
-        return NIL_VAL;
-    }
-
+    // Types are checked before the symbol is looked up: a bad type is a mistake in
+    // the script and raises an error, a missing symbol gives nil.
     ffi_type* rtype_scratch;
     int lunar_rtype_scratch;
     if (!parse_type(returnTypeStr, &rtype_scratch, &lunar_rtype_scratch)) {
+        runtime_error("cbind() doesn't know the type '%s'.", returnTypeStr->chars);
         return NIL_VAL;
     }
 
@@ -116,10 +116,16 @@ Value ffi_bind_function(int argCount, Value* args) {
 
         for (int i = 0; i < param_count; i++) {
             Value typeVal = args[3 + i];
-            if (!IS_STRING(typeVal) ||
-                !parse_type(AS_STRING(typeVal), &arg_types_scratch[i], &lunar_arg_types_scratch[i])) {
+            if (!IS_STRING(typeVal)) {
                 free(arg_types_scratch);
                 free(lunar_arg_types_scratch);
+                check_arg("cbind", args, 3 + i, false, "a string");
+                return NIL_VAL;
+            }
+            if (!parse_type(AS_STRING(typeVal), &arg_types_scratch[i], &lunar_arg_types_scratch[i])) {
+                free(arg_types_scratch);
+                free(lunar_arg_types_scratch);
+                runtime_error("cbind() doesn't know the type '%s'.", AS_STRING(typeVal)->chars);
                 return NIL_VAL;
             }
 
@@ -127,9 +133,22 @@ Value ffi_bind_function(int argCount, Value* args) {
             if (lunar_arg_types_scratch[i] == LUNAR_FFI_VOID) {
                 free(arg_types_scratch);
                 free(lunar_arg_types_scratch);
+                runtime_error("cbind() parameters can't have the type 'void'.");
                 return NIL_VAL;
             }
         }
+    }
+
+    void* symbol = NULL;
+#ifdef _WIN32
+    symbol = GetProcAddress((HMODULE)lib->handle, funcName->chars);
+#else
+    symbol = dlsym(lib->handle, funcName->chars);
+#endif
+    if (!symbol) {
+        free(arg_types_scratch);
+        free(lunar_arg_types_scratch);
+        return NIL_VAL;
     }
 
     // --- Phase 2: everything validated, safe to touch the GC heap now ---
@@ -171,8 +190,8 @@ Value ffi_bind_function(int argCount, Value* args) {
 
 Value ffi_call_bound(ObjFFIFunc* func, int argCount, Value* args) {
     if (argCount != func->arg_count) {
-        fprintf(stderr, "FFI Runtime Error: Function '%s' expected %d arguments, got %d.\n",
-                func->name->chars, func->arg_count, argCount);
+        runtime_error("Function '%s' expected %d arguments, got %d.",
+                      func->name->chars, func->arg_count, argCount);
         return NIL_VAL;
     }
 
@@ -182,15 +201,15 @@ Value ffi_call_bound(ObjFFIFunc* func, int argCount, Value* args) {
             case LUNAR_FFI_INT:
             case LUNAR_FFI_DOUBLE:
                 if (!IS_NUMBER(val)) {
-                    fprintf(stderr, "FFI Runtime Error: '%s' expected a number for argument %d.\n",
-                            func->name->chars, i + 1);
+                    runtime_error("'%s' expected a number for argument %d.",
+                                  func->name->chars, i + 1);
                     return NIL_VAL;
                 }
                 break;
             case LUNAR_FFI_STRING:
                 if (!IS_STRING(val)) {
-                    fprintf(stderr, "FFI Runtime Error: '%s' expected a string for argument %d.\n",
-                            func->name->chars, i + 1);
+                    runtime_error("'%s' expected a string for argument %d.",
+                                  func->name->chars, i + 1);
                     return NIL_VAL;
                 }
                 break;
@@ -208,7 +227,7 @@ Value ffi_call_bound(ObjFFIFunc* func, int argCount, Value* args) {
         if (!ffi_values || !memory_allocations) {
             free(ffi_values);
             free(memory_allocations);
-            fprintf(stderr, "FFI Runtime Error: out of memory binding arguments for '%s'.\n", func->name->chars);
+            runtime_error("Out of memory binding arguments for '%s'.", func->name->chars);
             return NIL_VAL;
         }
     }

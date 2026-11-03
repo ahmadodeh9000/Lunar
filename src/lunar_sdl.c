@@ -7,6 +7,7 @@
 #include "vm.h"
 #include "value.h"
 #include "object.h"
+#include "lunar_std.h"
 
 #if !SDL_VERSION_ATLEAST(2, 0, 18)
 #error "Lunar's triangle drawing needs SDL 2.0.18 or newer (SDL_RenderGeometry)"
@@ -28,7 +29,10 @@ static i32 mouse_dy = 0;
 
 
 static Value sdl_init_native(i32 argc, Value* args) {
-    if (argc < 3) return BOOL_VAL(false);
+    if (!check_arity("sdl_init", argc, 3) ||
+        !check_arg("sdl_init", args, 0, IS_STRING(args[0]), "a string") ||
+        !check_arg("sdl_init", args, 1, IS_NUMBER(args[1]), "a number") ||
+        !check_arg("sdl_init", args, 2, IS_NUMBER(args[2]), "a number")) return NIL_VAL;
 
     const char* title = AS_CSTRING(args[0]);
     i32 w = (i32)AS_NUMBER(args[1]);
@@ -47,7 +51,8 @@ static Value sdl_init_native(i32 argc, Value* args) {
 
 // sdl_load_texture(path) -> handle (number), or -1 on failure
 static Value sdl_load_texture_native(i32 argc, Value* args) {
-    if (argc < 1 || !IS_STRING(args[0])) return NUMBER_VAL(-1);
+    if (!check_arity("sdl_load_texture", argc, 1) ||
+        !check_arg("sdl_load_texture", args, 0, IS_STRING(args[0]), "a string")) return NIL_VAL;
     if (texture_count >= MAX_TEXTURES) return NUMBER_VAL(-1);
 
     const char* path = AS_CSTRING(args[0]);
@@ -67,7 +72,7 @@ static Value sdl_load_texture_native(i32 argc, Value* args) {
 
 // sdl_draw_texture(handle, x, y, w, h)
 static Value sdl_draw_texture_native(i32 argc, Value* args) {
-    if (argc < 5) return NIL_VAL;
+    if (!check_numbers("sdl_draw_texture", argc, args, 5)) return NIL_VAL;
 
     i32 handle = (i32)AS_NUMBER(args[0]);
     if (handle < 0 || handle >= texture_count) return NIL_VAL;
@@ -86,7 +91,7 @@ static Value sdl_draw_texture_native(i32 argc, Value* args) {
 // sdl_texture_width(handle) / sdl_texture_height(handle) —
 // handy for sizing rects to the image's native resolution
 static Value sdl_texture_width_native(i32 argc, Value* args) {
-    if (argc < 1) return NUMBER_VAL(0);
+    if (!check_numbers("sdl_texture_width", argc, args, 1)) return NIL_VAL;
     i32 handle = (i32)AS_NUMBER(args[0]);
     if (handle < 0 || handle >= texture_count) return NUMBER_VAL(0);
 
@@ -96,7 +101,7 @@ static Value sdl_texture_width_native(i32 argc, Value* args) {
 }
 
 static Value sdl_texture_height_native(i32 argc, Value* args) {
-    if (argc < 1) return NUMBER_VAL(0);
+    if (!check_numbers("sdl_texture_height", argc, args, 1)) return NIL_VAL;
     i32 handle = (i32)AS_NUMBER(args[0]);
     if (handle < 0 || handle >= texture_count) return NUMBER_VAL(0);
 
@@ -202,7 +207,8 @@ static bool lookup_scancode(const char* key, SDL_Scancode* out) {
 }
 
 static Value sdl_key_down_native(i32 argc, Value* args) {
-    if (argc < 1 || !IS_STRING(args[0])) return BOOL_VAL(false);
+    if (!check_arity("sdl_key_down", argc, 1) ||
+        !check_arg("sdl_key_down", args, 0, IS_STRING(args[0]), "a string")) return NIL_VAL;
 
     SDL_Scancode code;
     if (!lookup_scancode(AS_CSTRING(args[0]), &code)) return BOOL_VAL(false);
@@ -215,7 +221,8 @@ static Value sdl_key_down_native(i32 argc, Value* args) {
 // sdl_set_relative_mouse(bool) -> true on success; hides the cursor and keeps
 // reporting motion past the window edges
 static Value sdl_set_relative_mouse_native(i32 argc, Value* args) {
-    if (argc < 1 || !IS_BOOL(args[0])) return BOOL_VAL(false);
+    if (!check_arity("sdl_set_relative_mouse", argc, 1) ||
+        !check_arg("sdl_set_relative_mouse", args, 0, IS_BOOL(args[0]), "a bool")) return NIL_VAL;
     return BOOL_VAL(SDL_SetRelativeMouseMode(AS_BOOL(args[0]) ? SDL_TRUE : SDL_FALSE) == 0);
 }
 
@@ -224,14 +231,14 @@ static Value sdl_mouse_dy_native(i32 argc, Value* args) { return NUMBER_VAL((dou
 
 // sdl_mouse_down(button): 1 left, 2 middle, 3 right
 static Value sdl_mouse_down_native(i32 argc, Value* args) {
-    if (argc < 1 || !IS_NUMBER(args[0])) return BOOL_VAL(false);
+    if (!check_numbers("sdl_mouse_down", argc, args, 1)) return NIL_VAL;
     i32 button = (i32)AS_NUMBER(args[0]);
     if (button < 1 || button > 5) return BOOL_VAL(false);
     return BOOL_VAL((SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(button)) != 0);
 }
 
 static Value sdl_fill_rect_native(int argc, Value* args) {
-    if (argc < 8) return NIL_VAL;
+    if (!check_numbers("sdl_fill_rect", argc, args, 8)) return NIL_VAL;
     SDL_Rect rect = {
         (int)AS_NUMBER(args[0]),
         (int)AS_NUMBER(args[1]),
@@ -252,14 +259,6 @@ static Value sdl_fill_rect_native(int argc, Value* args) {
   ==========TRIANGLES=============
   ================================
 */
-static bool all_numbers(i32 argc, Value* args, i32 want) {
-    if (argc < want) return false;
-    for (i32 i = 0; i < want; i++) {
-        if (!IS_NUMBER(args[i])) return false;
-    }
-    return true;
-}
-
 static Uint8 color_byte(Value v) {
     double d = AS_NUMBER(v);
     return d >= 255 ? 255 : d > 0 ? (Uint8)d : 0;
@@ -272,7 +271,7 @@ static SDL_Vertex solid_vertex(Value x, Value y, SDL_Color color) {
 
 // sdl_draw_tri(x1,y1, x2,y2, x3,y3, r,g,b,a)
 static Value sdl_draw_tri_native(i32 argc, Value* args) {
-    if (!all_numbers(argc, args, 10) || renderer == NULL) return NIL_VAL;
+    if (!check_numbers("sdl_draw_tri", argc, args, 10) || renderer == NULL) return NIL_VAL;
 
     SDL_Color color = {
         color_byte(args[6]), color_byte(args[7]),
@@ -298,7 +297,7 @@ static SDL_Vertex textured_vertex(Value* a, SDL_Color color) {
 // sdl_draw_tri_tex(tex, x1,y1,u1,v1, x2,y2,u2,v2, x3,y3,u3,v3, shade)
 // UVs run 0-1 across the texture; shade 0-255 darkens it, 255 leaves it as is
 static Value sdl_draw_tri_tex_native(i32 argc, Value* args) {
-    if (!all_numbers(argc, args, 14) || renderer == NULL) return NIL_VAL;
+    if (!check_numbers("sdl_draw_tri_tex", argc, args, 14) || renderer == NULL) return NIL_VAL;
 
     i32 handle = (i32)AS_NUMBER(args[0]);
     if (handle < 0 || handle >= texture_count) return NIL_VAL;
@@ -322,8 +321,9 @@ static i32 batch_indices_cap = 0;
 
 #define VERTEX_STRIDE 5
 
-// sdl_draw_tris(tex, verts, vcount, indices, icount) -> triangles drawn, or nil
-// on a bad argument, in which case nothing is drawn.
+// sdl_draw_tris(tex, verts, vcount, indices, icount) -> triangles drawn. A bad
+// argument raises an error; nil means nothing was drawn (no window yet, a texture
+// handle that isn't loaded, or the renderer failed).
 // tex: a texture handle, or -1 for untextured.
 // verts: flat array of vcount vertices, 5 numbers each: x, y, u, v, rgba, where
 //   rgba packs the color as r*16777216 + g*65536 + b*256 + a.
@@ -331,18 +331,70 @@ static i32 batch_indices_cap = 0;
 //   are used; or nil to draw vertices in order (icount is then ignored).
 // Triangles are drawn in order, later ones on top.
 static Value sdl_draw_tris_native(i32 argc, Value* args) {
-    if (argc < 5 || renderer == NULL) return NIL_VAL;
-    if (!IS_NUMBER(args[0]) || !IS_ARRAY(args[1]) || !IS_NUMBER(args[2]) || !IS_NUMBER(args[4])) return NIL_VAL;
-    if (!IS_ARRAY(args[3]) && !IS_NIL(args[3])) return NIL_VAL;
-
-    i32 handle = (i32)AS_NUMBER(args[0]);
-    if (handle != -1 && (handle < 0 || handle >= texture_count)) return NIL_VAL;
-    SDL_Texture* tex = handle == -1 ? NULL : textures[handle];
+    const char* fn = "sdl_draw_tris";
+    if (!check_arity(fn, argc, 5) ||
+        !check_arg(fn, args, 0, IS_NUMBER(args[0]), "a number") ||
+        !check_arg(fn, args, 1, IS_ARRAY(args[1]), "an array") ||
+        !check_arg(fn, args, 2, IS_NUMBER(args[2]), "a number") ||
+        !check_arg(fn, args, 3, IS_ARRAY(args[3]) || IS_NIL(args[3]), "an array or nil") ||
+        !check_arg(fn, args, 4, IS_NUMBER(args[4]), "a number")) return NIL_VAL;
 
     ValueArray* src = &AS_ARRAY(args[1])->items;
     double vcount_d = AS_NUMBER(args[2]);
-    if (!(vcount_d >= 0) || vcount_d * VERTEX_STRIDE > src->count) return NIL_VAL;
+    if (!(vcount_d >= 0) || vcount_d * VERTEX_STRIDE > src->count) {
+        runtime_error("sdl_draw_tris(): vertex count %g needs %g numbers, but the array has %d.",
+                      vcount_d, vcount_d * VERTEX_STRIDE, src->count);
+        return NIL_VAL;
+    }
     i32 vcount = (i32)vcount_d;
+    if (IS_NIL(args[3]) && vcount % 3 != 0) {
+        runtime_error("sdl_draw_tris(): vertex count %d isn't a multiple of 3.", vcount);
+        return NIL_VAL;
+    }
+
+    // checked before drawing anything; a bad element raises an error below
+    Value* in = src->values;
+    for (i32 i = 0; i < vcount * VERTEX_STRIDE; i++) {
+        if (!IS_NUMBER(in[i])) {
+            runtime_error("sdl_draw_tris(): vertex element %d is a %s, not a number.", i, value_type_name(in[i]));
+            return NIL_VAL;
+        }
+        if (i % VERTEX_STRIDE == 4 && !(AS_NUMBER(in[i]) >= 0 && AS_NUMBER(in[i]) <= 4294967295.0)) {
+            runtime_error("sdl_draw_tris(): vertex %d has the color %g, outside 0 to 4294967295.", i / VERTEX_STRIDE, AS_NUMBER(in[i]));
+            return NIL_VAL;
+        }
+    }
+
+    ValueArray* idx = IS_NIL(args[3]) ? NULL : &AS_ARRAY(args[3])->items;
+    i32 icount = 0;
+    if (idx != NULL) {
+        double icount_d = AS_NUMBER(args[4]);
+        if (!(icount_d >= 0) || icount_d > idx->count) {
+            runtime_error("sdl_draw_tris(): index count %g is more than the %d indices given.", icount_d, idx->count);
+            return NIL_VAL;
+        }
+        icount = (i32)icount_d;
+        if (icount % 3 != 0) {
+            runtime_error("sdl_draw_tris(): index count %d isn't a multiple of 3.", icount);
+            return NIL_VAL;
+        }
+        for (i32 i = 0; i < icount; i++) {
+            if (!IS_NUMBER(idx->values[i])) {
+                runtime_error("sdl_draw_tris(): index %d is a %s, not a number.", i, value_type_name(idx->values[i]));
+                return NIL_VAL;
+            }
+            double n = AS_NUMBER(idx->values[i]);
+            if (!(n >= 0 && n < vcount)) {
+                runtime_error("sdl_draw_tris(): index %d is %g, outside the %d vertices.", i, n, vcount);
+                return NIL_VAL;
+            }
+        }
+    }
+
+    if (renderer == NULL) return NIL_VAL;
+    i32 handle = (i32)AS_NUMBER(args[0]);
+    if (handle != -1 && (handle < 0 || handle >= texture_count)) return NIL_VAL;
+    SDL_Texture* tex = handle == -1 ? NULL : textures[handle];
 
     if (vcount > batch_verts_cap) {
         SDL_Vertex* grown = realloc(batch_verts, sizeof(SDL_Vertex) * vcount);
@@ -351,13 +403,8 @@ static Value sdl_draw_tris_native(i32 argc, Value* args) {
         batch_verts_cap = vcount;
     }
 
-    Value* in = src->values;
     for (i32 i = 0; i < vcount; i++, in += VERTEX_STRIDE) {
-        if (!IS_NUMBER(in[0]) || !IS_NUMBER(in[1]) || !IS_NUMBER(in[2]) ||
-            !IS_NUMBER(in[3]) || !IS_NUMBER(in[4])) return NIL_VAL;
-        double packed = AS_NUMBER(in[4]);
-        if (!(packed >= 0 && packed <= 4294967295.0)) return NIL_VAL;
-        Uint32 rgba = (Uint32)packed;
+        Uint32 rgba = (Uint32)AS_NUMBER(in[4]);
         SDL_Vertex* out = &batch_verts[i];
         out->position.x = (float)AS_NUMBER(in[0]);
         out->position.y = (float)AS_NUMBER(in[1]);
@@ -374,11 +421,6 @@ static Value sdl_draw_tris_native(i32 argc, Value* args) {
         return NUMBER_VAL((double)(vcount / 3));
     }
 
-    ValueArray* idx = &AS_ARRAY(args[3])->items;
-    double icount_d = AS_NUMBER(args[4]);
-    if (!(icount_d >= 0) || icount_d > idx->count) return NIL_VAL;
-    i32 icount = (i32)icount_d;
-
     if (icount > batch_indices_cap) {
         int* grown = realloc(batch_indices, sizeof(int) * icount);
         if (grown == NULL) return NIL_VAL;
@@ -386,10 +428,7 @@ static Value sdl_draw_tris_native(i32 argc, Value* args) {
         batch_indices_cap = icount;
     }
     for (i32 i = 0; i < icount; i++) {
-        if (!IS_NUMBER(idx->values[i])) return NIL_VAL;
-        double n = AS_NUMBER(idx->values[i]);
-        if (!(n >= 0 && n < vcount)) return NIL_VAL;
-        batch_indices[i] = (int)n;
+        batch_indices[i] = (int)AS_NUMBER(idx->values[i]);
     }
 
     if (SDL_RenderGeometry(renderer, tex, batch_verts, vcount, batch_indices, icount) != 0) return NIL_VAL;
@@ -437,6 +476,7 @@ static Value sdl_poll_native(i32 argc, Value* args) {
 }
 
 static Value sdl_clear_native(i32 argc, Value* args) {
+    if (!check_numbers("sdl_clear", argc, args, 3)) return NIL_VAL;
     i32 r = (i32)AS_NUMBER(args[0]);
     i32 g = (i32)AS_NUMBER(args[1]);
     i32 b = (i32)AS_NUMBER(args[2]);
@@ -451,7 +491,7 @@ static Value sdl_present_native(i32 argc, Value* args) {
 }
 
 static Value sdl_delay_native(i32 argc, Value* args) {
-    if (argc < 1) return NIL_VAL;
+    if (!check_numbers("sdl_delay", argc, args, 1)) return NIL_VAL;
     SDL_Delay((i32)AS_NUMBER(args[0]));
     return NIL_VAL;
 }
@@ -467,14 +507,18 @@ static Value sdl_time_native(i32 argc, Value* args) {
 
 // sdl_set_vsync(bool) -> true on success
 static Value sdl_set_vsync_native(i32 argc, Value* args) {
-    if (argc < 1 || !IS_BOOL(args[0]) || renderer == NULL) return BOOL_VAL(false);
+    if (!check_arity("sdl_set_vsync", argc, 1) ||
+        !check_arg("sdl_set_vsync", args, 0, IS_BOOL(args[0]), "a bool")) return NIL_VAL;
+    if (renderer == NULL) return BOOL_VAL(false);
     return BOOL_VAL(SDL_RenderSetVSync(renderer, AS_BOOL(args[0]) ? 1 : 0) == 0);
 }
 
 // sdl_set_blend(bool) -> makes alpha apply to sdl_fill_rect and untextured
 // triangles; off by default
 static Value sdl_set_blend_native(i32 argc, Value* args) {
-    if (argc < 1 || !IS_BOOL(args[0]) || renderer == NULL) return BOOL_VAL(false);
+    if (!check_arity("sdl_set_blend", argc, 1) ||
+        !check_arg("sdl_set_blend", args, 0, IS_BOOL(args[0]), "a bool")) return NIL_VAL;
+    if (renderer == NULL) return BOOL_VAL(false);
     SDL_BlendMode mode = AS_BOOL(args[0]) ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE;
     return BOOL_VAL(SDL_SetRenderDrawBlendMode(renderer, mode) == 0);
 }

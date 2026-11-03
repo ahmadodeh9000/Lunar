@@ -1,0 +1,6 @@
+handling first
+-- stderr --
+Array index 3 out of bounds (length 1).
+[line 3] in handler()
+[line 5] in script
+-- exit 100 --

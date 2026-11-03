@@ -1,4 +1,12 @@
 // Prints FAIL for any wrong result, then "math: done".
+fn throws(f) {
+    try { f(); } catch (e) { ret true; }
+    ret false;
+}
+fn bad_sin()   { ret sin("x"); }
+fn bad_min()   { ret min(1); }
+fn bad_max()   { ret max(1, "x"); }
+fn bad_atan2() { ret atan2(1); }
 fn near(name, got, want) {
     if (got == nil || abs(got - want) > 0.000001) print "FAIL " + name + ": " + str(got);
 }
@@ -11,5 +19,5 @@ near("pow", pow(2, 10), 1024);
 near("pow frac", pow(9, 0.5), 3);
 near("min", min(2, -3), -3);
 near("max", max(2, -3), 2);
-if (sin("x") != nil || min(1) != nil || max(1, "x") != nil || atan2(1) != nil) print "FAIL bad args should give nil";
+if (!throws(bad_sin) || !throws(bad_min) || !throws(bad_max) || !throws(bad_atan2)) print "FAIL bad args should throw";
 print "math: done";

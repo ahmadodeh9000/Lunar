@@ -1,0 +1,2 @@
+// A non-string value is printed the way print shows it.
+throw { code: 404, path: "level9.lunar" };

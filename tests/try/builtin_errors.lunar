@@ -1,0 +1,59 @@
+// Every built-in raises a clear error on bad arguments; documented failure values stay.
+fn t(f) { try { print f(); } catch (e) { print e; } }
+
+fn a1() { ret sqrt(); }            t(a1);
+fn a2() { ret abs("1"); }          t(a2);
+fn a3() { ret floor(nil); }        t(a3);
+fn a4() { ret ceil([1]); }         t(a4);
+fn a5() { ret sin(1, 2); }         t(a5);
+fn a6() { ret cos({}); }           t(a6);
+fn a7() { ret tan(true); }         t(a7);
+fn a8() { ret atan2(1, "y"); }     t(a8);
+fn a9() { ret pow(2); }            t(a9);
+fn b1() { ret min("a", 1); }       t(b1);
+fn b2() { ret max(1, 2, 3); }      t(b2);
+fn b3() { ret len(nil); }          t(b3);
+fn b4() { ret push([]); }          t(b4);
+fn b5() { ret pop({}); }           t(b5);
+fn b6() { ret pop([]); }           t(b6);      // empty array: nil, as documented
+fn b7() { ret hex(255); }          t(b7);
+fn b8() { ret hex("zz"); }         t(b8);
+fn b9() { ret random(1); }         t(b9);
+fn c1() { ret random("1", 2); }    t(c1);
+fn c2() { ret has({}, 1.5); }      t(c2);      // a valid key: false
+fn c3() { ret keys({}, 1); }       t(c3);
+fn c4() { ret remove({}, "gone"); } t(c4);     // a missing key: nil, as documented
+fn c5() { ret str(); }             t(c5);
+fn c6() { ret str(1, 2); }         t(c6);
+
+// str() of every kind of value is the text print shows
+struct Point { init() { self.x = 1; } get() { ret self.x; } }
+fn named() {}
+print str(named);
+print str(Point);
+print str(Point());
+print str(Point().get);
+print str(sqrt);
+print str(0/0) == str(0/0);
+
+// FFI: bad arguments raise errors; a missing library or symbol is still nil
+fn d1() { ret clib(5); }                          t(d1);
+fn d2() { ret clib(); }                           t(d2);
+fn d3() { ret clib("/no/such/library.dylib"); }   t(d3);
+let libc = clib("");
+print libc != nil;
+fn e1() { ret cbind(libc, "abs"); }               t(e1);
+fn e2() { ret cbind("x", "abs", "int"); }         t(e2);
+fn e3() { ret cbind(libc, 1, "int"); }            t(e3);
+fn e4() { ret cbind(libc, "abs", "float"); }      t(e4);
+fn e5() { ret cbind(libc, "abs", "int", 3); }     t(e5);
+fn e6() { ret cbind(libc, "abs", "int", "quad"); } t(e6);
+fn e7() { ret cbind(libc, "abs", "int", "void"); } t(e7);
+fn e8() { ret cbind(libc, "no_such_symbol_xyz", "int"); } t(e8);
+let c_abs = cbind(libc, "abs", "int", "int");
+print c_abs(-5);
+fn f1() { ret c_abs(); }                          t(f1);
+fn f2() { ret c_abs("5"); }                       t(f2);
+let c_strlen = cbind(libc, "strlen", "int", "string");
+fn f3() { ret c_strlen(5); }                      t(f3);
+print c_strlen("four");

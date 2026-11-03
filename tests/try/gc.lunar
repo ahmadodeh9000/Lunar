@@ -1,0 +1,11 @@
+// Thrown maps and freshly built strings survive collection (also run under GC stress).
+fn fail(i) {
+    throw { id: i, msg: "error " + str(i), parts: [str(i), str(i * 2)] };
+}
+fn fail_string(i) { let s = "x" + str(i); throw s + s; }
+let total = 0;
+for (let i = 0; i < 200; i = i + 1) {
+    try { fail(i); } catch (e) { total = total + e.id + len(e.msg) + len(e.parts[1]); }
+    try { fail_string(i); } catch (e) { total = total + len(e); }
+}
+print total;

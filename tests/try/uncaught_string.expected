@@ -1,0 +1,7 @@
+start
+-- stderr --
+boom
+[line 2] in inner()
+[line 3] in outer()
+[line 5] in script
+-- exit 100 --

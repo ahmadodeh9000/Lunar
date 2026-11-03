@@ -1,0 +1,5 @@
+// An error inside a catch block with no try around it is uncaught.
+fn handler() {
+    try { throw "first"; } catch (e) { print "handling " + e; print [1][3]; }
+}
+handler();

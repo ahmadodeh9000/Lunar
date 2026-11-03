@@ -1,0 +1,23 @@
+// At most 256 try blocks can run at once; the 257th is an error the 256th catches.
+fn probe() {
+    try { print "probe ran"; } catch (e) { print "never"; }
+}
+// eight try blocks per call
+fn nest(n) {
+    try { try { try { try { try { try { try { try {
+        if (n > 1) nest(n - 1); else probe();
+    } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; }
+    } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; }
+}
+nest(31);      // 248 running, the probe is the 249th
+nest(32);      // 256 running, the probe would be the 257th
+
+// 10000 throw/catch cycles leak no handlers and no stack slots
+let caught = 0;
+for (let k = 0; k < 10000; k = k + 1) {
+    let a = k;
+    try { let b = a; throw b; } catch (e) { caught = caught + 1; }
+}
+print caught;
+let last = "last";
+print last;

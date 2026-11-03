@@ -1,0 +1,58 @@
+// break, continue, and ret leave their try blocks, so a later throw can't land in them.
+fn early() {
+    try { ret "returned"; } catch (e) { print "WRONG: early caught " + e; }
+}
+print early();
+try { throw "after ret"; } catch (e) { print "outer caught: " + e; }
+
+fn early_void() {
+    try { ret; } catch (e) { print "WRONG"; }
+}
+early_void();
+
+for (x in [1, 2, 3]) {
+    try {
+        if (x == 2) break;
+        print x;
+    } catch (e) { print "WRONG: loop caught " + e; }
+}
+try { throw "after break"; } catch (e) { print "outer caught: " + e; }
+
+let i = 0;
+while (i < 3) {
+    i = i + 1;
+    try {
+        try {
+            if (i < 3) continue;
+        } catch (e) { print "WRONG inner"; }
+    } catch (e) { print "WRONG outer"; }
+    print "i is " + str(i);
+}
+try { throw "after continue"; } catch (e) { print "outer caught: " + e; }
+
+// ret from nested try blocks inside a loop inside a try
+fn find(list, want) {
+    try {
+        for (x in list) {
+            try {
+                if (x == want) ret "found " + str(x);
+            } catch (e) { print "WRONG"; }
+        }
+    } catch (e) { print "WRONG"; }
+    ret "missing";
+}
+print find([1, 2, 3], 2);
+print find([1], 9);
+try { throw "after nested ret"; } catch (e) { print "outer caught: " + e; }
+
+// the value of ret is computed inside the try, so its error is caught there
+fn risky() {
+    try { ret 1 + nil; } catch (e) { ret "caught in risky: " + e; }
+}
+print risky();
+
+// break out of a loop inside a try leaves the try running
+try {
+    for (x in [1, 2]) { break; }
+    throw "still inside try";
+} catch (e) { print e; }

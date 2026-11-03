@@ -1,0 +1,4 @@
+-- stderr --
+[line 1] ERROR at 'catch': Expected expression.
+[line 1] ERROR at '}': Expected expression.
+-- exit 110 --

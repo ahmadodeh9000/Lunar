@@ -82,6 +82,7 @@ void free_lunar_vm() {
 
 static void reset_stack() {
     lvm.stack_top=lvm.stack; lvm.frame_count=0; lvm.open_upvalues=NULL;
+    lvm.handler_count=0; lvm.error_pending=false; lvm.error_value=NIL_VAL;
 }
 
 void push(Value val) {
@@ -92,7 +93,20 @@ Value pop()                 { return *--lvm.stack_top; }
 static Value peek(int d)    { return lvm.stack_top[-1-d]; }
 
 void runtime_error(const char* fmt, ...) {
-    va_list args; va_start(args,fmt); vfprintf(stderr,fmt,args); va_end(args);
+    va_list args, copy; va_start(args,fmt); va_copy(copy,args);
+    int len=vsnprintf(NULL,0,fmt,copy); va_end(copy);
+    char* buf=(char*)malloc((size_t)len+1);
+    if(buf==NULL){ fprintf(stderr,"OOM error message\n"); exit(1); }
+    vsnprintf(buf,(size_t)len+1,fmt,args); va_end(args);
+    lvm.error_value=OBJ_VAL(copy_str(buf,len));     // can GC; error_value is a root
+    free(buf);
+    lvm.error_pending=true;
+}
+
+// prints an error nobody caught: the value, then the stack trace from where it was thrown
+static void report_uncaught(Value err) {
+    if(IS_STRING(err)){ fwrite(AS_CSTRING(err),1,AS_STRING(err)->length,stderr); }
+    else { int n; char* text=value_text(err,&n); fwrite(text,1,n,stderr); free(text); }
     fputs("\n",stderr);
     for(int i=lvm.frame_count-1;i>=0;i--){
         CallFrame* f=&lvm.frames[i]; ObjFunction* fn=f->closure->function;
@@ -101,7 +115,22 @@ void runtime_error(const char* fmt, ...) {
         if(fn->name==NULL) fprintf(stderr,"script\n");
         else               fprintf(stderr,"%s()\n",fn->name->chars);
     }
-    reset_stack();
+}
+
+// Sends the error in error_value to the newest try handler: back to its frame and
+// stack height, with the error pushed for the catch variable. With no handler it's
+// reported and the VM reset; returns false then.
+static bool catch_error() {
+    Value err=lvm.error_value;
+    if(lvm.handler_count==0){ report_uncaught(err); reset_stack(); return false; }
+    Handler* h=&lvm.handlers[--lvm.handler_count];
+    lvm.frame_count=h->frame_count;
+    close_upvalues(h->stack_top);
+    lvm.stack_top=h->stack_top;
+    push(err);
+    lvm.error_value=NIL_VAL; lvm.error_pending=false;
+    lvm.frames[lvm.frame_count-1].ip=h->catch_ip;
+    return true;
 }
 
 static bool is_falsey(Value v){ return IS_NIL(v)||(IS_BOOL(v)&&!AS_BOOL(v)); }
@@ -133,7 +162,7 @@ static bool call_value(Value callee, int argc) {
         case OBJ_NATIVE: {
             NativeFn fn=AS_NATIVE(callee);
             Value res=fn(argc,lvm.stack_top-argc);
-            if(lvm.frame_count==0) return false;   // the native raised runtime_error, which reset the stack
+            if(lvm.error_pending) return false;     // the native raised runtime_error
             lvm.stack_top-=argc+1; push(res); return true;
         }
         case OBJ_STRUCT: {
@@ -158,7 +187,7 @@ static bool call_value(Value callee, int argc) {
             
             // Invoke the FFI engine directly!
             Value result = ffi_call_bound(func, argc,args);
-            if (lvm.frame_count == 0) return false;   // runtime_error reset the stack
+            if (lvm.error_pending) return false;      // it raised runtime_error
             
             // Wind down the stack frame: pop args and the function object itself
             lvm.stack_top -= argc + 1;
@@ -245,6 +274,17 @@ static bool invoke(ObjString* name, int argc) {
     return invoke_from_class(inst->klass,name,argc);
 }
 
+// Runs until the script ends. run() leaves on every runtime error and throw, with the
+// error pending; if a try handler takes it, run() starts again inside the catch.
+// (Keeping the error exits as plain returns keeps the dispatch loop as fast as before.)
+static InterpretResult run_catching() {
+    for(;;){
+        InterpretResult result=run();
+        if(result!=INTERPRET_RUNTIME_ERR || !lvm.error_pending) return result;   // done, or an internal bug
+        if(!catch_error()) return INTERPRET_RUNTIME_ERR;
+    }
+}
+
 InterpretResult interpret(const char* src) {
     ObjFunction* fn=compile(src);
     if(fn==NULL) return INTERPRET_COMPILE_ERR;
@@ -252,7 +292,7 @@ InterpretResult interpret(const char* src) {
     ObjClosure* closure=new_closure(fn);
     pop(); push(OBJ_VAL(closure));
     call(closure,0);
-    return run();
+    return run_catching();
 }
 
 static InterpretResult run() {
@@ -435,6 +475,16 @@ static InterpretResult run() {
                 push(items->items.values[i]);
                 break;
             }
+
+            case OP_TRY: {
+                u16 o=READ_SHORT();
+                if(lvm.handler_count==HANDLERS_MAX){ runtime_error("Too many nested try blocks."); return INTERPRET_RUNTIME_ERR; }
+                Handler* h=&lvm.handlers[lvm.handler_count++];
+                h->frame_count=lvm.frame_count; h->stack_top=lvm.stack_top; h->catch_ip=frame->ip+o;
+                break;
+            }
+            case OP_POP_HANDLER: lvm.handler_count--; break;
+            case OP_THROW: lvm.error_value=pop(); lvm.error_pending=true; return INTERPRET_RUNTIME_ERR;
 
             case OP_GET_INDEX: {
                 if (!IS_ARRAY(peek(1))) {

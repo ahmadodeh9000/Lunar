@@ -1,0 +1,28 @@
+caught boom
+43
+7
+{code: 7, why: bad}
+2
+nil
+Operands must be two numbers or two strings.
+Undefined variable 'undefined_thing'.
+Array index 5 out of bounds (length 1).
+Can only call functions and structs.
+Expected 1 arguments but got 2.
+Map key must be a string, number, or bool.
+Can only loop over arrays, maps, and strings.
+Invalid hexadecimal string.
+Operand must be a number.
+sqrt() expects a number for argument 1 (got string).
+fine
+x!
+still here
+shadow
+still here
+inner caught inner
+outer caught outer
+first again
+Operands must be two numbers or two strings.
+level 3 missing
+-- stderr --
+-- exit 0 --

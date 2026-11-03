@@ -18,6 +18,8 @@ while (running && sdl_time() - start < 5) {
     sdl_present();
 }
 sdl_set_relative_mouse(false);
-if (sdl_mouse_down("x") != false || sdl_mouse_down(9) != false) print "FAIL bad args";
+let threw = false;
+try { sdl_mouse_down("x"); } catch (e) { threw = true; }   // a bad argument raises an error
+if (!threw || sdl_mouse_down(9) != false) print "FAIL bad args";
 sdl_quit();
 print "moved " + str(total_x) + ", " + str(total_y) + " left=" + str(left) + " right=" + str(right);

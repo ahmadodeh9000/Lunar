@@ -1,0 +1,33 @@
+// SDL natives raise an error on bad arguments and keep their documented failure values.
+// Needs `make sdl`. Prints FAIL for anything wrong, then "sdl_errors: done". No window opens.
+fn throws(f) {
+    try { f(); } catch (e) { ret true; }
+    ret false;
+}
+fn e1() { sdl_init(5, 640, 480); }           if (!throws(e1)) print "FAIL sdl_init types";
+fn e2() { sdl_init("t", 640); }              if (!throws(e2)) print "FAIL sdl_init count";
+fn e3() { sdl_clear(); }                     if (!throws(e3)) print "FAIL sdl_clear count";
+fn e4() { sdl_clear(1, 2, "b"); }            if (!throws(e4)) print "FAIL sdl_clear types";
+fn e5() { sdl_fill_rect(1, 2, 3); }          if (!throws(e5)) print "FAIL sdl_fill_rect";
+fn e6() { sdl_delay("16"); }                 if (!throws(e6)) print "FAIL sdl_delay";
+fn e7() { sdl_key_down(1); }                 if (!throws(e7)) print "FAIL sdl_key_down";
+fn e8() { sdl_load_texture(); }              if (!throws(e8)) print "FAIL sdl_load_texture";
+fn e9() { sdl_draw_texture(0, 1, 2); }       if (!throws(e9)) print "FAIL sdl_draw_texture";
+fn f1() { sdl_texture_width("a"); }          if (!throws(f1)) print "FAIL sdl_texture_width";
+fn f2() { sdl_texture_height(); }            if (!throws(f2)) print "FAIL sdl_texture_height";
+fn f3() { sdl_set_relative_mouse(1); }       if (!throws(f3)) print "FAIL sdl_set_relative_mouse";
+fn f4() { sdl_mouse_down("left"); }          if (!throws(f4)) print "FAIL sdl_mouse_down";
+fn f5() { sdl_set_vsync("on"); }             if (!throws(f5)) print "FAIL sdl_set_vsync";
+fn f6() { sdl_set_blend(); }                 if (!throws(f6)) print "FAIL sdl_set_blend";
+fn f7() { sdl_draw_tri(1, 2, 3); }           if (!throws(f7)) print "FAIL sdl_draw_tri";
+fn f8() { sdl_draw_tri_tex(0, 1); }          if (!throws(f8)) print "FAIL sdl_draw_tri_tex";
+fn f9() { sdl_draw_tris(-1, [], 3, nil, 0); } if (!throws(f9)) print "FAIL sdl_draw_tris";
+
+// documented failure values, before sdl_init
+if (sdl_texture_width(7) != 0)     print "FAIL texture width of a bad handle";
+if (sdl_texture_height(7) != 0)    print "FAIL texture height of a bad handle";
+if (sdl_draw_texture(7, 0, 0, 1, 1) != nil) print "FAIL draw of a bad handle";
+if (sdl_mouse_down(9) != false)    print "FAIL mouse button out of range";
+if (sdl_set_vsync(true) != false)  print "FAIL vsync before init";
+if (sdl_set_blend(true) != false)  print "FAIL blend before init";
+print "sdl_errors: done";

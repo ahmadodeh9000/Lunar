@@ -1,0 +1,48 @@
+// throw and try/catch: any value can be thrown; VM and built-in errors arrive as strings.
+try { throw "boom"; } catch (e) { print "caught " + e; }
+try { throw 42; } catch (e) { print e + 1; }
+try { throw { code: 7, why: "bad" }; } catch (e) { print e.code; print e; }
+try { throw [1, 2]; } catch (e) { print len(e); }
+try { throw nil; } catch (e) { print e; }
+
+// runtime errors from the VM
+try { print 1 + "a"; } catch (e) { print e; }
+try { print undefined_thing; } catch (e) { print e; }
+try { let a = [1]; print a[5]; } catch (e) { print e; }
+try { let x = 3; x(); } catch (e) { print e; }
+try { fn f(a) {} f(1, 2); } catch (e) { print e; }
+try { let m = {}; m[[1]] = 1; } catch (e) { print e; }
+try { for (x in 5) print x; } catch (e) { print e; }
+try { print hex("zz"); } catch (e) { print e; }
+try { print -"a"; } catch (e) { print e; }
+
+// errors from built-ins
+try { sqrt("x"); } catch (e) { print e; }
+
+// no error: the catch block is skipped
+try { print "fine"; } catch (e) { print "never"; }
+
+// the script carries on after a caught error, and the catch variable is scoped
+let after = "still here";
+try { throw "x"; } catch (err) { let inside = err + "!"; print inside; }
+print after;
+try { throw "shadow"; } catch (after) { print after; }
+print after;
+
+// nested try: the inner one catches first
+try {
+    try { throw "inner"; } catch (e) { print "inner caught " + e; }
+    throw "outer";
+} catch (e) { print "outer caught " + e; }
+
+// rethrow, and an error raised inside a catch block
+try {
+    try { throw "first"; } catch (e) { throw e + " again"; }
+} catch (e) { print e; }
+try {
+    try { throw "first"; } catch (e) { print 1 + nil; }
+} catch (e) { print e; }
+
+// a thrown string built at runtime
+let n = 3;
+try { throw "level " + str(n) + " missing"; } catch (e) { print e; }

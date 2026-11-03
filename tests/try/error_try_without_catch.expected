@@ -1,0 +1,4 @@
+-- stderr --
+[line 2] ERROR at 'print': Expect 'catch' after try block.
+[line 3] ERROR at end: Expect '}' after block.
+-- exit 110 --

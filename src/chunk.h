@@ -30,6 +30,7 @@ typedef enum {
     OP_APPEND_ARRAY,
     OP_BUILD_MAP, OP_APPEND_MAP,
     OP_ITER_PREP, OP_FOR_ITER,
+    OP_TRY, OP_POP_HANDLER, OP_THROW,
     OP_WIDE,        // prefix: the next opcode's constant index is 3 bytes, not 1
 } OpCode;
 

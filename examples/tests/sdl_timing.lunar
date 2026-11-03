@@ -10,6 +10,8 @@ if (wall < 0.19 || wall > 0.5) print "FAIL wall " + str(wall);
 if (cpu > 0.1) print "FAIL cpu " + str(cpu);
 if (!sdl_set_vsync(false) || !sdl_set_vsync(true)) print "FAIL vsync";
 if (!sdl_set_blend(true) || !sdl_set_blend(false)) print "FAIL blend";
-if (sdl_set_blend(1) != false) print "FAIL bad arg";
+let threw = false;
+try { sdl_set_blend(1); } catch (e) { threw = true; }       // a bad argument raises an error
+if (!threw) print "FAIL bad arg";
 sdl_quit();
 print "sdl_timing: done";

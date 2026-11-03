@@ -1,4 +1,4 @@
-// Built-in functions, including today's nil-on-bad-arguments behavior.
+// Built-in functions, and the errors they raise on bad arguments.
 print sqrt(16);
 print abs(-3);
 print floor(2.7);
@@ -16,10 +16,11 @@ let r = random(1, 6);
 print r >= 1 && r <= 6 && r == floor(r);
 print random(5, 5);
 print clock() >= 0;
-print sqrt("x");
-print len(5);
-print len();
-print push(1, 2);
-print pop("x");
 print str(clock);
-print min(1);
+// bad arguments raise an error (before M5 they returned nil)
+try { sqrt("x"); } catch (e) { print e; }
+try { len(5); } catch (e) { print e; }
+try { len(); } catch (e) { print e; }
+try { push(1, 2); } catch (e) { print e; }
+try { pop("x"); } catch (e) { print e; }
+try { min(1); } catch (e) { print e; }

@@ -14,13 +14,13 @@ map: {x: [1, 2]}
 {}
 0
 {again: true}
-nil
-nil
-nil
-nil
-nil
-nil
-nil
+has() expects a map for argument 1 (got number).
+Map key must be a string, number, or bool.
+has() takes 2 arguments (got 1).
+keys() expects a map for argument 1 (got array).
+keys() takes 1 argument (got 0).
+Map key must be a string, number, or bool.
+remove() expects a map for argument 1 (got string).
 1
 -- stderr --
 -- exit 0 --

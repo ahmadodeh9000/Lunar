@@ -1,0 +1,5 @@
+Stack overflow.
+6765
+again: Stack overflow.
+-- stderr --
+-- exit 0 --

@@ -1,0 +1,6 @@
+// Too many call frames is catchable, and the VM works normally afterwards.
+fn forever(n) { ret forever(n + 1); }
+try { forever(0); } catch (e) { print e; }
+fn fib(n) { if (n < 2) ret n; ret fib(n - 1) + fib(n - 2); }
+print fib(20);
+try { forever(0); } catch (e) { print "again: " + e; }

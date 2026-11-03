@@ -1,0 +1,13 @@
+returned
+outer caught: after ret
+1
+outer caught: after break
+i is 3
+outer caught: after continue
+found 2
+missing
+outer caught: after nested ret
+caught in risky: Operands must be two numbers or two strings.
+still inside try
+-- stderr --
+-- exit 0 --

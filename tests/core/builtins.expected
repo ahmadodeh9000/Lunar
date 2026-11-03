@@ -14,12 +14,12 @@ s
 true
 5
 true
-nil
-nil
-nil
-nil
-nil
-nil
-nil
+<native fn clock>
+sqrt() expects a number for argument 1 (got string).
+len() expects a string, array, or map for argument 1 (got number).
+len() takes 1 argument (got 0).
+push() expects an array for argument 1 (got number).
+pop() expects an array for argument 1 (got string).
+min() takes 2 arguments (got 1).
 -- stderr --
 -- exit 0 --

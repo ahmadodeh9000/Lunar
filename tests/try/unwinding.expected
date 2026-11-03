@@ -1,0 +1,16 @@
+from level3
+locked door
+nobody home
+true
+from a closure
+from level3
+2
+before after divide by zero
+nil
+abc
+unwound
+kept
+skip
+[10, 20, 30]
+-- stderr --
+-- exit 0 --

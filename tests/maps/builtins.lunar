@@ -26,12 +26,12 @@ print len(m);
 m.again = true;
 print m;
 
-// bad arguments give nil, like the other built-ins (until M5)
-print has(1, "a");
-print has(m, nil);
-print has(m);
-print keys([1]);
-print keys();
-print remove(m, [1]);
-print remove("x", "y");
+// bad arguments raise an error
+try { has(1, "a"); } catch (e) { print e; }
+try { has(m, nil); } catch (e) { print e; }
+try { has(m); } catch (e) { print e; }
+try { keys([1]); } catch (e) { print e; }
+try { keys(); } catch (e) { print e; }
+try { remove(m, [1]); } catch (e) { print e; }
+try { remove("x", "y"); } catch (e) { print e; }
 print len({ a: nil });

@@ -1,0 +1,5 @@
+throwing
+-- stderr --
+nobody catches this
+[line 6] in script
+-- exit 100 --

@@ -113,6 +113,9 @@ static void mark_roots() {
 
     // init string
     mark_object((Obj*)lvm.init_string);
+
+    // the error being thrown
+    mark_value(lvm.error_value);
 }
 
 /* ───────── Trace (blacken) phase ───────── */
