@@ -6,8 +6,9 @@ another git ref (main by default), run side by side.
 Each benchmark runs 15 times per binary, alternating between the two so both
 see the same machine conditions, and the medians are compared. A benchmark
 more than 5% slower is re-run once; it is a regression only if it is still
-more than 5% slower. bench/compare.py (the saved baseline) is a secondary
-reference.
+more than 5% slower. A benchmark the ref can't run (it uses a newer feature)
+is timed on the current build only. bench/compare.py (the saved baseline) is
+a secondary reference.
 
 Usage (from the repo root, after `make`):
     python3 bench/ab.py
@@ -63,6 +64,11 @@ def run(binary, path):
     return time.perf_counter() - t0
 
 
+def runs_ok(binary, path):
+    p = subprocess.run([binary, path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return p.returncode == 0
+
+
 def ab(old, new, path, runs):
     """Medians of `runs` alternating runs of each binary, after one warmup each."""
     run(old, path); run(new, path)
@@ -86,6 +92,10 @@ def main():
         regressions = []
         print(f"| Benchmark | {args.ref} | now | Change |\n|---|---|---|---|")
         for name, path in programs(tmp).items():
+            if not runs_ok(old, path):
+                m_new = statistics.median(run(args.lunar, path) for _ in range(args.runs))
+                print(f"| {name} | n/a (new) | {m_new:.3f} s | |")
+                continue
             m_old, m_new = ab(old, args.lunar, path, args.runs)
             if m_new > m_old * (1 + LIMIT):
                 m_old, m_new = ab(old, args.lunar, path, args.runs)   # re-run once

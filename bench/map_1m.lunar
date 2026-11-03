@@ -1,0 +1,9 @@
+let m = {};
+for (let i = 0; i < 200000; i = i + 1) { m[i] = i; }
+let total = 0;
+for (let i = 0; i < 200000; i = i + 1) { total = total + m[i]; }
+for (let i = 0; i < 200000; i = i + 1) { m[i] = m[i] + 1; }
+for (let i = 0; i < 200000; i = i + 2) { remove(m, i); }
+let s = { hp: 0, mp: 1, xp: 0 };
+for (let i = 0; i < 100000; i = i + 1) { s.hp = s.hp + 1; s.xp = s.xp + s.mp; }
+print total + len(m) + s.hp + s.xp;
