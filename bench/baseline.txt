@@ -1,0 +1,11 @@
+# Lunar benchmark baseline, commit 41a15e0, 2026-11-03, mean and stdev of 10 runs (s)
+tak(24,16,8)	0.0960	0.0005
+mandelbrot (300x300)	0.1198	0.0003
+sieve (2M)	0.3591	0.0006
+matmul (100x100)	0.0579	0.0002
+binary trees (d15 x8)	0.1288	0.0008
+bench/array_1m.lunar	0.0970	0.0002
+bench/closures_1m.lunar	0.0560	0.0003
+bench/fib_32.lunar	0.2299	0.0047
+bench/loop_10m.lunar	0.3619	0.0013
+bench/method_calls_1m.lunar	0.0649	0.0002
