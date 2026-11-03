@@ -32,6 +32,7 @@ d.speak();
 - **Structs and single inheritance**: `self`, `super`, bound methods, dynamic fields
 - **Arrays**: literals, nested arrays, indexing and index assignment, `push` / `pop` / `len`
 - **Maps**: insertion-ordered key/value literals, `m[k]` and `m.k` access, `has` / `keys` / `remove`
+- **Error handling**: `throw` any value, `try` / `catch` runtime and built-in errors
 - **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
 - **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
 - **Foreign Function Interface**: call into native shared libraries via `libffi`
@@ -551,6 +552,46 @@ print factorial(10);   // 3628800
 
 ---
 
+### Errors
+
+`throw` raises an error, and `try` / `catch` handles it. Any value can be thrown:
+
+```lunar
+fn load_level(n) {
+    if (n > 5) throw "no level " + str(n);
+    ret "level " + str(n);
+}
+
+try {
+    print load_level(7);
+} catch (e) {
+    print "couldn't load: " + e;      // couldn't load: no level 7
+}
+```
+
+Runtime errors and errors from built-ins can be caught the same way. For those, the catch variable holds the message:
+
+```lunar
+try {
+    let items = [1, 2, 3];
+    print items[10];
+} catch (e) {
+    print e;                          // Array index 10 out of bounds (length 3).
+}
+
+try { sqrt("nine"); } catch (e) { print e; }
+// sqrt() expects a number for argument 1 (got string).
+```
+
+- A `throw` unwinds through function calls to the nearest running `try`. The `catch` block runs in the function that holds the `try`, with that function's locals intact.
+- `throw e;` inside a `catch` passes the error on, and an error inside a `catch` goes to the next `try` out.
+- An error nobody catches prints its value and a stack trace from where it was thrown, then exits with code 100, as before.
+- `break`, `continue`, and `ret` work inside `try` blocks.
+- At most 256 `try` blocks can be running at once; going past that raises "Too many nested try blocks.".
+- There is no `finally` yet. `try`, `catch`, and `throw` are reserved words.
+
+---
+
 ## Built-in Functions
 
 | Function      | Signature                    | Description                                               |
@@ -578,7 +619,7 @@ print factorial(10);   // 3628800
 | `hex(s)`      | `(string) → number`          | Parse a hexadecimal string                                |
 | `random(x,y)` | `(number, number) → number`  | Random integer in the range `[x, y]`                      |
 
-Built-ins called with the wrong argument types return `nil` rather than raising an error.
+A built-in called with the wrong number or kind of arguments raises an error you can [catch](#errors), such as `sqrt() expects a number for argument 1 (got string).` Results that mean an operation failed are unchanged: `pop` on an empty array and `remove` of a missing key give `nil`.
 
 ---
 
@@ -596,6 +637,8 @@ cbind(lib, name, ret_type, param1, param2, ...)
                         // Binds a native symbol and returns a callable closure.
                         // Returns nil if the symbol can't be found.
 ```
+
+`clib` returns `nil` when the library can't be loaded, and `cbind` when the symbol isn't there. Bad arguments raise an error: a non-string path, an unknown type name, or calling a bound function with the wrong number or kind of arguments.
 
 ### Example: calling a system function
 
@@ -666,6 +709,8 @@ Arrays can't be passed to FFI functions yet.
 ## SDL2 API
 
 Only available when built with `make sdl` (requires SDL2 and SDL2_image).
+
+Like the other built-ins, SDL functions raise an error when called with the wrong number or kind of arguments. The failure values described below (`-1`, `false`, `0`, `nil`) are unchanged.
 
 ### Lifecycle
 
@@ -741,13 +786,13 @@ sdl_draw_tri_tex(tex, x1,y1,u1,v1, x2,y2,u2,v2, x3,y3,u3,v3, shade)
 To draw many triangles, batch them into one call. In one test of 8000 textured triangles it took about a third less frame time than one call per triangle:
 
 ```lunar
-sdl_draw_tris(tex, verts, vcount, indices, icount)   // triangles drawn, or nil on a bad argument
+sdl_draw_tris(tex, verts, vcount, indices, icount)   // triangles drawn; nil if nothing could be drawn
 ```
 
 - `tex` is a texture handle, or `-1` for untextured.
 - `verts` is a flat array with 5 numbers per vertex: `x, y, u, v, rgba`, where `rgba` is `r*16777216 + g*65536 + b*256 + a`. It can be longer than `vcount`, so one preallocated array can be reused.
 - `indices` lists vertex numbers, 3 per triangle, and only the first `icount` are used. Pass `nil` to draw vertices in order, 3 per triangle.
-- If any argument or element is invalid, or the count isn't a multiple of 3, nothing is drawn.
+- If any argument or element is invalid, or the count isn't a multiple of 3, it raises an error and nothing is drawn. A texture handle that isn't loaded, or calling it before `sdl_init`, draws nothing and gives `nil`.
 
 ```lunar
 // one textured quad: two triangles sharing an edge
@@ -929,7 +974,6 @@ Notes:
 
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
 - No file or stdin I/O, and no module system
-- A runtime error aborts the script; there is no error handling
 - Arrays can't be passed to FFI functions yet
 
 ---
