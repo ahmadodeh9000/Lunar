@@ -11,7 +11,7 @@ Lunar is a small, friendly language for games, tools, and scripts. Each mileston
 - [x] **M5** Errors: `throw`, `try` / `catch`, built-ins throw on bad arguments
 - [x] **M6** String interpolation and escapes: `"hp: {hp}"`, `\n` `\t` `\"` `\\` `\{`
 - ~~**M8** Multiple return values~~ (dropped)
-- [ ] **M9** Modules: `import("path.lunar")`
+- [x] **M9** Modules: `import("path.lunar")`
 
 ## Later
 

@@ -33,6 +33,7 @@ d.speak();
 - **Arrays**: literals, nested arrays, indexing and index assignment, `push` / `pop` / `len`
 - **Maps**: insertion-ordered key/value literals, `m[k]` and `m.k` access, `has` / `keys` / `remove`
 - **Error handling**: `throw` any value, `try` / `catch` runtime and built-in errors
+- **Modules**: `import("file.lunar")`, each file with its own globals, run once and cached
 - **Strings**: interpolation with `"hp: {hp}"`, and the escapes `\n` `\t` `\"` `\\` `\{`
 - **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
 - **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
@@ -626,6 +627,36 @@ try { sqrt("nine"); } catch (e) { print e; }
 
 ---
 
+### Modules
+
+`import("path.lunar")` runs another file and gives you the value of its top-level `ret`, usually a map:
+
+```lunar
+// lib/vec.lunar
+fn add(a, b) { ret { x: a.x + b.x, y: a.y + b.y }; }
+fn length(v) { ret sqrt(v.x * v.x + v.y * v.y); }
+ret { add: add, length: length };
+```
+
+```lunar
+// main.lunar
+let vec = import("lib/vec.lunar");
+print vec.length(vec.add({ x: 1, y: 2 }, { x: 2, y: 2 }));   // 5
+```
+
+- **Paths are relative to the importing file**, not to the directory `lunar` was started in. In the REPL they're relative to the current directory.
+- **A file runs once.** Later imports of it, from any file, give the same value. `lib/vec.lunar` and `./lib/../lib/vec.lunar` are the same file.
+- **Each file has its own globals.** A module can't see the main script's variables, or another module's; share things through what it returns. Built-ins such as `len` and `str` are visible everywhere, and redefining one in a module only affects that module.
+- **Exports** are the value of the file's top-level `ret`; a file without one gives `nil`. `ret` at the top level ends the file, in the main script too.
+- **Errors can be caught:** a missing file (`Can't find module 'x.lunar' (looked for /full/path/x.lunar).`), a circular import (`Circular import: a.lunar -> b.lunar -> a.lunar.`), a compile error in the module, or an error its top-level code raises. A module that fails isn't cached, so importing it again runs it again.
+- Stack traces and compile errors in an imported file name the file, as in `[lib/vec.lunar line 2] in add()`.
+- A name without `/` or `.lunar`, like `import("string")`, is reserved for built-in modules, which don't exist yet.
+- `import` is a reserved word, and only works as `import(...)`.
+
+See `examples/modules/` for a small multi-file program.
+
+---
+
 ## Built-in Functions
 
 | Function      | Signature                    | Description                                               |
@@ -1007,7 +1038,7 @@ Notes:
 ## Known Limitations
 
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
-- No file or stdin I/O, and no module system
+- No file or stdin I/O
 - Arrays can't be passed to FFI functions yet
 
 ---
