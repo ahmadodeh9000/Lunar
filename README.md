@@ -31,6 +31,7 @@ d.speak();
 - **First-class functions and closures**: functions capture variables by reference across scopes
 - **Structs and single inheritance**: `self`, `super`, bound methods, dynamic fields
 - **Arrays**: literals, nested arrays, indexing and index assignment, `push` / `pop` / `len`
+- **Maps**: insertion-ordered key/value literals, `m[k]` and `m.k` access, `has` / `keys` / `remove`
 - **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
 - **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
 - **Foreign Function Interface**: call into native shared libraries via `libffi`
@@ -115,6 +116,7 @@ x = 20;
 | Nil      | `nil`            | Absence of a value                               |
 | String   | `"hello"`        | UTF-8, multi-line supported                      |
 | Array    | `[1, "a", nil]`  | Heap-allocated, mixed types, reference semantics |
+| Map      | `{ hp: 10 }`     | Insertion-ordered, reference semantics           |
 | Function | `fn f() { ... }` | First-class closure                              |
 | Instance | `Point(x, y)`    | Instance of a struct                             |
 
@@ -260,8 +262,70 @@ print map([1, 2, 3], square);   // [1, 4, 9]
   ```
 - **Equality is by reference.** `[1] == [1]` is `false`; `a == b` above is `true`.
 - **Indexes must be whole numbers within bounds.** `a[-1]`, `a[1.5]`, and `a[len(a)]` are runtime errors. Setting an index never grows the array; use `push`.
-- **Only arrays can be indexed.** Indexing anything else is a runtime error, as is a non-number index.
-- **Printing.** `print` shows elements in brackets, with strings unquoted: `[1, a, nil]`.
+- **Only arrays and maps can be indexed.** Indexing anything else is a runtime error, as is a non-number array index.
+- **Printing.** `print` shows elements in brackets, with strings unquoted: `[1, a, nil]`. An array inside itself prints as `[...]` (a map as `{...}`), and `str` does the same.
+
+---
+
+### Maps
+
+Maps hold key/value pairs and remember the order keys were added in.
+
+```lunar
+let empty  = {};
+let player = { name: "Rex", hp: 10, "max hp": 12 };
+print player;               // {name: Rex, hp: 10, max hp: 12}
+```
+
+A bare name before `:` is a string key, so `{ hp: 10 }` is `{ "hp": 10 }`. Any other key is an expression; wrap a variable in parentheses to use its value:
+
+```lunar
+let stat = "speed";
+let stats = { (stat): 3, 1: "one", true: "yes" };
+print stats["speed"];       // 3
+```
+
+**Reading and writing**
+
+```lunar
+print player["hp"];         // 10
+print player.hp;            // 10, the same thing
+print player.mana;          // nil: a missing key reads as nil
+
+player.hp = 7;              // update; the key keeps its place
+player["level"] = 2;        // add; new keys go at the end
+print player;               // {name: Rex, hp: 7, max hp: 12, level: 2}
+```
+
+**Built-ins**
+
+```lunar
+print len(player);          // 4
+print has(player, "mana");  // false
+print keys(player);         // [name, hp, max hp, level]
+print remove(player, "level");   // 2, the removed value
+```
+
+**Functions in maps**
+
+```lunar
+fn heal(target, amount) { target.hp = target.hp + amount; }
+let actions = { heal: heal };
+actions.heal(player, 5);    // a plain call: the map is not passed as self
+print player.hp;            // 12
+```
+
+**Rules and behavior**
+
+- **Maps never have methods.** `keys`, `has`, `remove`, and `len` are plain functions, so `m.anything` always means the key `"anything"`, even `m.keys` or `m.len`.
+- **`m.f(x)` is a plain function call.** The function stored at `"f"` gets exactly the arguments you pass, with no `self`. This is the same as calling a function stored in a struct field.
+- **Keys are strings, numbers, or bools.** Any other key, or `NaN`, is a runtime error. `1` and `1.0` are the same key, as are `0` and `-0`; `1` and `"1"` are different keys.
+- **`nil` is a value, not a delete.** `m.k = nil` keeps the key; use `remove` to delete it, and `has` to tell a stored `nil` from a missing key.
+- **Order.** `keys`, `print`, and `str` follow insertion order. Updating a key keeps its place; removing and re-adding it moves it to the end.
+- **Reference semantics.** Like arrays, assigning or passing a map shares it, and `==` compares identity.
+- **A `{` at the start of a statement is a block.** Use a map literal where an expression goes: after `=`, `ret`, `print`, in arguments, inside `( )` or `[ ]`.
+- **Key names that are keywords** (`self`, `ret`, ...) only work with `m["self"]`, not `m.self`, just like struct fields.
+- **Printing.** `print` shows `{key: value, ...}` with strings unquoted, like arrays do.
 
 ---
 
@@ -482,10 +546,13 @@ print factorial(10);   // 3628800
 | `pow(b,e)`    | `(number, number) → number`  | `b` raised to the power `e`                               |
 | `min(a,b)`    | `(number, number) → number`  | The smaller of two numbers                                |
 | `max(a,b)`    | `(number, number) → number`  | The larger of two numbers                                 |
-| `str(x)`      | `(value) → string`           | Convert a number, bool, nil, string, or array to a string |
-| `len(x)`      | `(string \| array) → number` | String length in bytes, or number of array elements       |
+| `str(x)`      | `(value) → string`           | Convert a number, bool, nil, string, array, or map to a string |
+| `len(x)`      | `(string \| array \| map) → number` | String length in bytes, or number of array elements or map entries |
 | `push(a, v)`  | `(array, any) → array`       | Append `v` to `a`; returns the array, so calls chain      |
 | `pop(a)`      | `(array) → any`              | Remove and return the last element; `nil` if empty        |
+| `has(m, k)`   | `(map, key) → bool`          | Whether `m` has the key `k`                               |
+| `keys(m)`     | `(map) → array`              | A new array of the keys, in insertion order               |
+| `remove(m, k)`| `(map, key) → any`           | Remove the key and return its value; `nil` if it was missing |
 | `hex(s)`      | `(string) → number`          | Parse a hexadecimal string                                |
 | `random(x,y)` | `(number, number) → number`  | Random integer in the range `[x, y]`                      |
 
@@ -838,11 +905,10 @@ Notes:
 
 ## Known Limitations
 
-- No `for x in array`, and no hash maps
+- No `for x in array`
 - Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
 - No file or stdin I/O, and no module system
 - A runtime error aborts the script; there is no error handling
-- `print` on an array that contains itself recurses without end
 - Arrays can't be passed to FFI functions yet
 
 ---
