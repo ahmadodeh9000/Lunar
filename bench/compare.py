@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Compares the current ./lunar against a saved baseline (bench/baseline.txt).
+This is a secondary reference: the official check is bench/ab.py.
 
 Runs both Lunar suites: the bench.py workloads (tak, mandelbrot, sieve, matmul,
 binary trees) and the bench/*.lunar programs. A benchmark more than 5% slower
