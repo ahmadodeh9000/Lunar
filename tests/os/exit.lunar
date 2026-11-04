@@ -1,0 +1,13 @@
+// os.exit ends the process at once, with output flushed (here stdout is a pipe);
+// try can't catch it.
+let os = import("os");
+let child = import("lib/lunar.lunar");
+fn show(cmd) {
+    let r = os.run(cmd);
+    print str(r.code) + " " + r.out;
+}
+show(child + " exit");
+show(child + " exit 0");
+show(child + " exit 3");
+show(child + " exit 255");
+show(child + " exit_in_try");

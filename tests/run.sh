@@ -15,6 +15,7 @@
 # not tests themselves.
 
 LUNAR=${1:-./lunar}
+export LUNAR_BIN="$LUNAR"     # so tests can start a child of the same build with os.run
 ROOT=$(pwd -P)
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT

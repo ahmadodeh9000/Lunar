@@ -1,0 +1,24 @@
+// Helpers for the os tests, run as a child process. The first argument picks one.
+let os = import("os");
+let string = import("string");
+let what = os.args[0];
+if (what == "args") {
+    print os.args;
+} else if (what == "env") {
+    print os.env("LUNAR_TEST_VALUE");
+} else if (what == "exit") {
+    print "printed before exit";
+    if (len(os.args) == 1) os.exit();
+    os.exit(string.to_number(os.args[1]));
+} else if (what == "exit_in_try") {
+    try { os.exit(4); } catch (e) { print "caught?"; }
+    print "not reached";
+} else if (what == "input") {
+    let line = os.input("prompt> ");
+    while (line != nil) {
+        print "[" + line + "]";
+        line = os.input();
+    }
+    print "end of input";
+    print os.input();
+}

@@ -1,0 +1,24 @@
+os.env() takes 1 argument (got 0).
+os.env() expects a string for argument 1 (got number).
+os.env() name can't contain a NUL byte.
+os.exit() takes 0 or 1 arguments (got 2).
+os.exit() expects a number for argument 1 (got string).
+os.exit() expects a code from 0 to 255 (got 256).
+os.exit() expects a code from 0 to 255 (got -1).
+os.exit() expects a code from 0 to 255 (got 1.5).
+os.run() takes 1 argument (got 0).
+os.run() expects a string for argument 1 (got array).
+os.run() command can't contain a NUL byte.
+os.time() takes 0 arguments (got 1).
+os.clock() takes 0 arguments (got 1).
+os.sleep() takes 1 argument (got 0).
+os.sleep() expects a number for argument 1 (got string).
+os.sleep() can't sleep a negative time (got -1).
+os.sleep() can't sleep that long (got 1e+10).
+os.cwd() takes 0 arguments (got 1).
+os.input() expects a string for argument 1 (got number).
+os.input() takes 0 or 1 arguments (got 2).
+-- stderr --
+os.sleep() can't sleep a negative time (got -0.5).
+[line 26] in script
+-- exit 100 --

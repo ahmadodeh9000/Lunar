@@ -1,0 +1,26 @@
+// Bad arguments throw catchable errors.
+let os = import("os");
+let string = import("string");
+let nul = "a" + string.from_byte(0) + "b";
+try { os.env(); } catch (e) { print e; }
+try { os.env(1); } catch (e) { print e; }
+try { os.env(nul); } catch (e) { print e; }
+try { os.exit(1, 2); } catch (e) { print e; }
+try { os.exit("1"); } catch (e) { print e; }
+try { os.exit(256); } catch (e) { print e; }
+try { os.exit(-1); } catch (e) { print e; }
+try { os.exit(1.5); } catch (e) { print e; }
+try { os.run(); } catch (e) { print e; }
+try { os.run(["ls"]); } catch (e) { print e; }
+try { os.run("echo " + nul); } catch (e) { print e; }
+try { os.time(1); } catch (e) { print e; }
+try { os.clock(nil); } catch (e) { print e; }
+try { os.sleep(); } catch (e) { print e; }
+try { os.sleep("1"); } catch (e) { print e; }
+try { os.sleep(-1); } catch (e) { print e; }
+try { os.sleep(10000000000); } catch (e) { print e; }
+try { os.cwd(1); } catch (e) { print e; }
+try { os.input(1); } catch (e) { print e; }
+try { os.input("a", "b"); } catch (e) { print e; }
+// an uncaught one reports the line and exits
+os.sleep(-0.5);

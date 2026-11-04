@@ -1,0 +1,6 @@
+true
+<root>
+true
+true
+-- stderr --
+-- exit 0 --

@@ -1,0 +1,16 @@
+// time is Unix seconds, clock is monotonic wall time, sleep waits.
+let os = import("os");
+let now = os.time();
+print now > 1700000000;
+print now != floor(now) || os.time() != floor(os.time());   // it has a fraction
+let start = os.clock();
+os.sleep(0.05);
+let took = os.clock() - start;
+print took >= 0.05;
+print took < 1;
+os.sleep(0);
+print os.clock() >= start;
+// the global clock() is CPU time: sleeping hardly moves it
+let cpu = clock();
+os.sleep(0.1);
+print clock() - cpu < 0.05;

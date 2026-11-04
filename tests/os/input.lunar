@@ -1,0 +1,7 @@
+// os.input reads a line at a time and gives nil at the end of input.
+let os = import("os");
+let child = import("lib/lunar.lunar");
+let r = os.run("printf 'first\\nsecond\\r\\n\\nlast' | " + child + " input");
+print r.out;
+print os.run("printf '' | " + child + " input").out;
+print os.run("printf 'x\\n' | " + child + " input").out;

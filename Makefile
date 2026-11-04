@@ -58,7 +58,7 @@ endif
 SRC = src/chunk.c src/compiler.c src/debug.c src/main.c \
       src/memory.c src/object.c src/scanner.c src/table.c \
       src/value.c src/vm.c src/lunar_std.c src/lunar_ffi.c \
-      src/map.c src/lunar_modules.c src/lunar_string.c src/lunar_fs.c
+      src/map.c src/lunar_modules.c src/lunar_string.c src/lunar_fs.c src/lunar_os.c
 
 SDL_SRC = $(SRC) src/lunar_sdl.c
 

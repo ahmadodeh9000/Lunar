@@ -1,0 +1,6 @@
+let os = import("os");
+let p = os.platform;
+print p == "macos" || p == "linux" || p == "windows" || p == "other";
+print os.cwd();
+print import("os") == os;
+print os.args == import("os").args;    // one array, shared by every importer

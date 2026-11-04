@@ -1,0 +1,29 @@
+// os.run returns { code, out, err }; a failing command is data, not an error.
+let os = import("os");
+let string = import("string");
+let r = os.run("echo out; echo err >&2; exit 3");
+print r.code;
+print r.out;
+print r.err;
+print keys(r);
+print os.run("true").code;
+print os.run("false").code;
+print os.run("").code;
+print os.run("kill -9 $$").code;          // killed by a signal: 128 + 9
+let missing = os.run("lunar_no_such_command_xyz");
+print missing.code;
+print string.contains(missing.err, "lunar_no_such_command_xyz");
+print os.run("echo a | tr a b").out;      // a shell: pipes work
+print os.run("cd tests && pwd").out == os.cwd() + "/tests\n";
+
+// bytes come back unchanged
+let bin = os.run("printf 'a\\000b\\377'").out;
+print len(bin);
+print string.byte(bin, 1);
+print string.byte(bin, 3);
+
+// a lot on both streams at once doesn't deadlock
+let big = os.run("head -c 1000000 /dev/zero; head -c 700000 /dev/zero >&2; echo done >&2");
+print len(big.out);
+print len(big.err);
+print big.code;

@@ -1,0 +1,6 @@
+// os.args holds the words after the script's name.
+let os = import("os");
+let child = import("lib/lunar.lunar");     // the first word picks what child.lunar does
+print os.args;
+print os.run(child + " args a 'b c' ''").out;
+print os.run(child + " args").out;

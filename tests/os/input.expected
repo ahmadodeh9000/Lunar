@@ -1,0 +1,16 @@
+prompt> [first]
+[second]
+[]
+[last]
+end of input
+nil
+
+prompt> end of input
+nil
+
+prompt> [x]
+end of input
+nil
+
+-- stderr --
+-- exit 0 --

@@ -1,0 +1,23 @@
+3
+out
+
+err
+
+[code, out, err]
+0
+1
+0
+137
+127
+true
+b
+
+true
+4
+0
+255
+1e+06
+700005
+0
+-- stderr --
+-- exit 0 --

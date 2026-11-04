@@ -1,0 +1,5 @@
+// The command that starts a child Lunar of the same build as the test.
+let os = import("os");
+let bin = os.env("LUNAR_BIN");
+if (bin == nil) bin = "./lunar";
+ret bin + " tests/os/lib/child.lunar";
