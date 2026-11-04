@@ -1,0 +1,34 @@
+// 1024 calls can be active at once; the next one is a catchable stack overflow.
+fn depth(n) {
+    let here = n;
+    let get = fn_for(here);
+    if (n == 0) ret get();
+    let below = depth(n - 1);
+    if (get() != here) print "local broken at " + str(n);
+    ret below + 1;
+}
+fn fn_for(v) { fn get() { ret v; } ret get; }
+
+print depth(1000);                      // 1001 frames of depth, plus the script's
+
+fn forever(n) { ret forever(n + 1); }
+try { forever(0); } catch (e) { print e; }
+try { depth(1100); } catch (e) { print "1100: " + e; }
+print depth(1000);                      // works again after the overflow
+
+// 1022 nested calls is the most that fits: script + 1023 frames
+fn count(n) { if (n == 0) ret 0; ret count(n - 1) + 1; }
+print count(1022);
+try { count(1023); } catch (e) { print "1023: " + e; }
+
+// a try in every frame
+fn guarded(n) {
+    try {
+        if (n == 0) throw "bottom";
+        ret guarded(n - 1);
+    } catch (e) {
+        if (n == 900) print "caught at 900: " + e;
+        throw e;
+    }
+}
+try { guarded(900); } catch (e) { print "top: " + e; }

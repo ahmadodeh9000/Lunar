@@ -1,0 +1,42 @@
+// A small recursive-descent evaluator in Lunar: the kind of program the larger
+// call stack is for. Each "(" costs three frames: expr -> term -> factor.
+let string = import("string");
+
+fn Parser(text) { ret { text: text, at: 0 }; }
+fn peek(p) {
+    if (p.at >= len(p.text)) ret "";
+    ret string.slice(p.text, p.at, p.at + 1);
+}
+fn take(p) { let c = peek(p); p.at = p.at + 1; ret c; }
+
+fn expr(p) {
+    let v = term(p);
+    while (peek(p) == "+" || peek(p) == "-") {
+        if (take(p) == "+") v = v + term(p); else v = v - term(p);
+    }
+    ret v;
+}
+fn term(p) {
+    let v = factor(p);
+    while (peek(p) == "*") { take(p); v = v * factor(p); }
+    ret v;
+}
+fn factor(p) {
+    if (peek(p) == "(") {
+        take(p);
+        let v = expr(p);
+        if (take(p) != ")") throw "expected )";
+        ret v;
+    }
+    let digits = "";
+    while (peek(p) != "" && string.contains("0123456789", peek(p))) digits = digits + take(p);
+    if (digits == "") throw "expected a number at " + str(p.at);
+    ret string.to_number(digits);
+}
+
+fn nested(levels) {
+    ret string.repeat("(", levels) + "1" + string.repeat("+1)", levels);
+}
+print expr(Parser("2*(3+4)-5"));
+print expr(Parser(nested(300)));        // about 900 frames deep
+try { expr(Parser(nested(400))); } catch (e) { print "400 levels: " + e; }

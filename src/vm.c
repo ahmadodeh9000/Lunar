@@ -115,19 +115,34 @@ void runtime_error(const char* fmt, ...) {
     lvm.error_pending=true;
 }
 
-// prints an error nobody caught: the value, then the stack trace from where it was thrown
+static int frame_line(CallFrame* f) {
+    ObjFunction* fn=f->closure->function;
+    return fn->chunk.lines[f->ip-fn->chunk.code-1];
+}
+
+static void print_frame(CallFrame* f) {
+    ObjFunction* fn=f->closure->function;
+    bool imported=fn->module!=lvm.main_module;      // the main script's lines look as they always did
+    if(imported) fprintf(stderr,"[%s line %d] in ",fn->module->name->chars,frame_line(f));
+    else         fprintf(stderr,"[line %d] in ",frame_line(f));
+    if(fn->name==NULL) fprintf(stderr,imported?"module\n":"script\n");
+    else               fprintf(stderr,"%s()\n",fn->name->chars);
+}
+
+// Prints an error nobody caught: the value, then the stack trace from where it was
+// thrown. A run of identical frames (deep recursion) shows 3 of them and a count.
 static void report_uncaught(Value err) {
     if(IS_STRING(err)){ fwrite(AS_CSTRING(err),1,AS_STRING(err)->length,stderr); }
     else { int n; char* text=value_text(err,&n); fwrite(text,1,n,stderr); free(text); }
     fputs("\n",stderr);
-    for(int i=lvm.frame_count-1;i>=0;i--){
-        CallFrame* f=&lvm.frames[i]; ObjFunction* fn=f->closure->function;
-        size_t instr=f->ip-fn->chunk.code-1;
-        bool imported=fn->module!=lvm.main_module;      // the main script's lines look as they always did
-        if(imported) fprintf(stderr,"[%s line %d] in ",fn->module->name->chars,fn->chunk.lines[instr]);
-        else         fprintf(stderr,"[line %d] in ",fn->chunk.lines[instr]);
-        if(fn->name==NULL) fprintf(stderr,imported?"module\n":"script\n");
-        else               fprintf(stderr,"%s()\n",fn->name->chars);
+    for(int i=lvm.frame_count-1;i>=0;){
+        CallFrame* f=&lvm.frames[i];
+        int same=1;
+        while(i-same>=0 && lvm.frames[i-same].closure->function==f->closure->function &&
+              frame_line(&lvm.frames[i-same])==frame_line(f)) same++;
+        for(int k=0;k<same && k<3;k++) print_frame(f);
+        if(same>3) fprintf(stderr,"... repeated %d more time%s\n",same-3,same==4?"":"s");
+        i-=same;
     }
 }
 

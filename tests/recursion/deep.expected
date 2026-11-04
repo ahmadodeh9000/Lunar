@@ -1,0 +1,10 @@
+1000
+Stack overflow.
+1100: Stack overflow.
+1000
+1022
+1023: Stack overflow.
+caught at 900: bottom
+top: bottom
+-- stderr --
+-- exit 0 --

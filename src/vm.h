@@ -7,8 +7,8 @@
 #include "object.h"
 
 #define STACK_MAX       (FRAMES_MAX * 256)
-#define FRAMES_MAX      64
-#define HANDLERS_MAX    256
+#define FRAMES_MAX      1024
+#define HANDLERS_MAX    (FRAMES_MAX * 2)
 
 typedef struct {
     ObjClosure* closure;

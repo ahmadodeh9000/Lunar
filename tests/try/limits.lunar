@@ -1,4 +1,4 @@
-// At most 256 try blocks can run at once; the 257th is an error the 256th catches.
+// At most 2048 try blocks can run at once; the 2049th is an error the 2048th catches.
 fn probe() {
     try { print "probe ran"; } catch (e) { print "never"; }
 }
@@ -9,8 +9,8 @@ fn nest(n) {
     } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; }
     } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; } } catch (e) { print e; }
 }
-nest(31);      // 248 running, the probe is the 249th
-nest(32);      // 256 running, the probe would be the 257th
+nest(255);     // 2040 running, the probe is the 2041st
+nest(256);     // 2048 running, the probe would be the 2049th
 
 // 10000 throw/catch cycles leak no handlers and no stack slots
 let caught = 0;

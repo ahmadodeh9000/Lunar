@@ -1,0 +1,9 @@
+// An uncaught error's trace shows 3 of a run of identical frames, then a count.
+fn three(n) { if (n == 0) ret down(4); ret three(n - 1); }
+fn down(n) {
+    if (n == 0) throw "deep error";
+    ret down(n - 1);
+}
+fn a(n) { if (n == 0) ret three(2); ret b(n - 1); }
+fn b(n) { ret a(n); }
+a(2);

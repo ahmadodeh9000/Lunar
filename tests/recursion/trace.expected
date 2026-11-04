@@ -1,0 +1,17 @@
+-- stderr --
+deep error
+[line 4] in down()
+[line 5] in down()
+[line 5] in down()
+[line 5] in down()
+... repeated 1 more time
+[line 2] in three()
+[line 2] in three()
+[line 2] in three()
+[line 7] in a()
+[line 8] in b()
+[line 7] in a()
+[line 8] in b()
+[line 7] in a()
+[line 9] in script
+-- exit 100 --
