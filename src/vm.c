@@ -44,7 +44,7 @@ static bool            invoke_from_class(ObjStruct* klass, ObjString* name, int 
 void define_native(const char* name, NativeFn fn) {
     push(OBJ_VAL(copy_str(name,(int)strlen(name))));
     push(OBJ_VAL(new_native(fn,name)));
-    table_set(&lvm.builtins, AS_STRING(lvm.stack[0]), lvm.stack[1]);
+    table_set(&lvm.builtins, AS_STRING(lvm.stack_top[-2]), lvm.stack_top[-1]);
     pop(); pop();
 }
 
