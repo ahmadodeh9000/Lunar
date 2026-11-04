@@ -16,10 +16,19 @@ void define_module_native(ObjMap* map, const char* name, NativeFn fn) {
     pop(); pop();
 }
 
+// adds a value to a built-in module's map; the caller keeps the map and value reachable
+void define_module_value(ObjMap* map, const char* name, Value value) {
+    push(value);
+    push(OBJ_VAL(copy_str(name,(int)strlen(name))));
+    map_set(map, lvm.stack_top[-1], lvm.stack_top[-2]);
+    pop(); pop();
+}
+
 // the modules import("name") opens, each once; their maps are shared by every importer
 static const struct { const char* name; void (*open)(ObjMap*); } builtin_modules[] = {
     { "string", open_string_module },
     { "fs",     open_fs_module },
+    { "os",     open_os_module },
 };
 
 // import("name"): the name is on top of the stack, and is replaced by the module's map

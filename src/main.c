@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "lunar_modules.h"
 #include "common.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,9 +12,11 @@ static char* readFile(const char* path);
 int main(int argc, char** argv) {
     init_lunar_vm();
 
-    if      (argc == 1) repl();
-    else if (argc == 2) run_file(argv[1]);
-    else    fprintf(stderr, "Usage: lunar [path]\n");
+    if (argc == 1) repl();
+    else {
+        set_script_args(argc - 2, argv + 2);   // the words after the script, for os.args
+        run_file(argv[1]);
+    }
 
     free_lunar_vm();
     return 0;

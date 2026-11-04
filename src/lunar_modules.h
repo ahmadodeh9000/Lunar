@@ -10,5 +10,12 @@ bool import_builtin(ObjString* name);
 // Built-in modules: each fills the map that import("name") returns.
 void open_string_module(ObjMap* map);
 void open_fs_module(ObjMap* map);
+void open_os_module(ObjMap* map);
+
+// adds a value (not a function) to a built-in module's map
+void define_module_value(ObjMap* map, const char* name, Value value);
+
+// the command-line words after the script's name, for os.args (main.c sets them)
+void set_script_args(int argc, char** argv);
 
 #endif
