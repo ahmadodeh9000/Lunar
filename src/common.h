@@ -9,7 +9,7 @@
 
 /* LUNAR CONSTANTS */
 #define LUNAR_NAME          "Lunar"
-#define LUNAR_VERSION       "0.2.0"
+#define LUNAR_VERSION       "0.3.0"
 
 /* LUNAR ERROR CODES */
 #define LUNAR_NOT_ENOUGH_MEMORY         10
