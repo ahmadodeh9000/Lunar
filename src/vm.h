@@ -24,11 +24,13 @@ typedef struct {
 } Handler;
 
 typedef struct {
-    CallFrame frames[FRAMES_MAX];
+    // the fields run() touches on every instruction come first, before the big
+    // arrays, so they're at small offsets from lvm
+    Value*  stack_top;
     int frame_count;
 
+    CallFrame frames[FRAMES_MAX];
     Value   stack[STACK_MAX];
-    Value*  stack_top;
 
     Table   builtins;   // natives, copied into every module's globals
     Table   modules;    // canonical path -> ObjModule, the import cache
