@@ -34,7 +34,7 @@ d.speak();
 - **Maps**: insertion-ordered key/value literals, `m[k]` and `m.k` access, `has` / `keys` / `remove`
 - **Error handling**: `throw` any value, `try` / `catch` runtime and built-in errors
 - **Modules**: `import("file.lunar")`, each file with its own globals, run once and cached
-- **Built-in modules**: `import("string")` for splitting, joining, searching, slicing, and case; `import("fs")` for files and folders
+- **Built-in modules**: `import("string")` for splitting, joining, searching, slicing, and case; `import("fs")` for files and folders; `import("os")` for arguments, commands, time, and input
 - **Strings**: interpolation with `"hp: {hp}"`, and the escapes `\n` `\t` `\"` `\\` `\{`
 - **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
 - **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
@@ -85,6 +85,9 @@ make sdl
 ```bash
 # Run a script
 ./lunar script.lunar
+
+# Run a script with arguments (they're in os.args)
+./lunar script.lunar input.txt --verbose
 
 # Start the REPL
 ./lunar
@@ -665,7 +668,7 @@ See `examples/modules/` for a small multi-file program.
 | Function      | Signature                    | Description                                               |
 |---------------|------------------------------|-----------------------------------------------------------|
 | `print`       | `print x`                    | Print a value followed by a newline                       |
-| `clock()`     | `() → number`                | CPU seconds used by the program (not wall-clock time)     |
+| `clock()`     | `() → number`                | CPU time used so far, in seconds; it doesn't advance while the program sleeps or waits. For elapsed time use `os.clock()` |
 | `sqrt(x)`     | `(number) → number`          | Square root                                               |
 | `abs(x)`      | `(number) → number`          | Absolute value                                            |
 | `floor(x)`    | `(number) → number`          | Round toward negative infinity                            |
@@ -765,6 +768,40 @@ print fs.list("out");                   // [logs]
 
 try { fs.read("missing.txt"); } catch (e) { print e; }
 // fs.read() can't read "missing.txt": No such file or directory.
+```
+
+### os
+
+The program and its surroundings.
+
+| Name | Signature | Description |
+|------|-----------|-------------|
+| `args` | `array` | The words after the script's name: `lunar tool.lunar a b` gives `[a, b]` (`[]` in the REPL) |
+| `env(name)` | `(string) → string \| nil` | An environment variable, or `nil` if it isn't set |
+| `exit(code?)` | `(number?)` | End the program now with `code` (0–255, default 0). Output is flushed; `try` doesn't catch it |
+| `run(cmd)` | `(string) → map` | Run a shell command and wait. Returns `{ code, out, err }` with the exit code and everything it wrote |
+| `time()` | `() → number` | Seconds since 1970 (Unix time), with a fraction |
+| `clock()` | `() → number` | Wall-clock seconds from a clock that never jumps; subtract two readings to time something |
+| `sleep(s)` | `(number)` | Pause for `s` seconds; fractions are fine |
+| `platform` | `string` | `"macos"`, `"linux"`, `"windows"`, or `"other"` |
+| `cwd()` | `() → string` | The current directory |
+| `input(prompt?)` | `(string?) → string \| nil` | Print `prompt`, then read a line from standard input without its line ending; `nil` at the end of input |
+
+`run` only throws when the command can't be started at all. A command that fails gives its exit code: `127` when the shell can't find it, and `128 + n` when signal `n` killed it. stdin is shared with the command, so interactive commands work.
+
+**`run` goes through `/bin/sh`.** Pipes and redirects work, but so does anything else the shell understands. Never build a command from text you don't control, such as a filename from `os.args` or a line from `os.input()`: a name like `x; rm -rf ~` runs the second command too.
+
+The global `clock()` measures CPU time, so it stands still while the program sleeps, waits for `run`, or waits for input. To time a task as a person would, use `os.clock()`:
+
+```lunar
+let os = import("os");
+let start = os.clock();
+let r = os.run("ls");
+print "ls exited with {r.code} after {os.clock() - start} s";
+
+let name = os.input("name? ");
+if (name == nil) os.exit(1);           // no input at all
+print "hi, {name}";
 ```
 
 ---
@@ -1119,8 +1156,8 @@ Notes:
 ## Known Limitations
 
 - Strings can't be indexed with `s[i]`; use `string.byte` or `string.slice`
-- No stdin I/O
 - Arrays can't be passed to FFI functions yet
+- Modules, `fs`, and `os` use POSIX calls, so they need macOS or Linux (no Windows build yet)
 
 ---
 
