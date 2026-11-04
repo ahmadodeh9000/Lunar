@@ -1,0 +1,30 @@
+-- exit 0
+       2       5      29 tests/tools/data/two_lines.txt
+       2       5      29 total
+
+-- exit 0
+       2       5      29 tests/tools/data/two_lines.txt
+       1       7      34 tests/tools/data/mixed.txt
+       0       0       0 tests/tools/data/empty.txt
+       3      12      63 total
+
+-- exit 1
+       2       5      29 tests/tools/data/two_lines.txt
+       1       7      34 tests/tools/data/mixed.txt
+       3      12      63 total
+
+stderr: wc: fs.read() can't read "tests/tools/data/missing.txt": No such file or directory.
+
+-- exit 1
+       0       0       0 total
+
+stderr: wc: fs.read() can't read "tests/tools/data/": Is a directory.
+
+-- exit 0
+       2       3      14
+
+-- exit 0
+       0       0       0
+
+-- stderr --
+-- exit 0 --

@@ -1,0 +1,22 @@
+// Runs examples/tools/wc.lunar as a child, the way someone would use it.
+let os = import("os");
+let bin = os.env("LUNAR_BIN");
+if (bin == nil) bin = "./lunar";
+let wc = bin + " examples/tools/wc.lunar";
+let data = "tests/tools/data/";
+
+fn run(cmd) {
+    let r = os.run(cmd);
+    print "-- exit " + str(r.code);
+    print r.out;
+    if (r.err != "") print "stderr: " + r.err;
+}
+
+run(wc + " " + data + "two_lines.txt");
+run(wc + " " + data + "two_lines.txt " + data + "mixed.txt " + data + "empty.txt");
+// a file it can't read is reported, the rest are counted, and the exit code is 1
+run(wc + " " + data + "two_lines.txt " + data + "missing.txt " + data + "mixed.txt");
+run(wc + " " + data);
+// no files: standard input
+run("printf 'one two\\nthree\\n' | " + wc);
+run("printf '' | " + wc);

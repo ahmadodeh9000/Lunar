@@ -1,0 +1,77 @@
+// wc: counts lines, words, and bytes, like the Unix tool.
+//     ./lunar examples/tools/wc.lunar [files...]
+// With no files it reads standard input. A file it can't read is reported on
+// stderr; the rest are still counted, and the exit code is 1.
+let fs = import("fs");
+let os = import("os");
+let string = import("string");
+
+// Lunar's print writes to stdout, so errors go to stderr through libc's write()
+let libc = clib("");
+let c_write = nil;
+if (libc) c_write = cbind(libc, "write", "int", "int", "string", "int");
+fn error(message) {
+    let line = "wc: " + message + "\n";
+    if (c_write) c_write(2, line, len(line));
+    else print line;
+}
+
+// words are runs of anything but spaces, tabs, and line endings
+let CR = string.from_byte(13);
+fn count_words(text) {
+    let spaced = string.replace(string.replace(string.replace(text, "\t", " "), "\n", " "), CR, " ");
+    let n = 0;
+    for (word in string.split(spaced, " ")) {
+        if (word != "") n = n + 1;
+    }
+    ret n;
+}
+
+fn counts(text) {
+    ret { lines: len(string.split(text, "\n")) - 1, words: count_words(text), bytes: len(text) };
+}
+
+// a number right-aligned in 8 columns, like wc
+fn pad(n) {
+    let s = str(n);
+    if (len(s) >= 8) ret s;
+    ret string.repeat(" ", 8 - len(s)) + s;
+}
+
+fn show(c, name) {
+    let row = pad(c.lines) + pad(c.words) + pad(c.bytes);
+    if (name != nil) row = row + " " + name;
+    print row;
+}
+
+// standard input, a line at a time; os.input drops line endings, so each line
+// read is counted as ending in a single "\n"
+fn read_stdin() {
+    let parts = [];
+    let line = os.input();
+    while (line != nil) {
+        push(parts, line + "\n");
+        line = os.input();
+    }
+    ret string.join(parts, "");
+}
+
+if (len(os.args) == 0) {
+    show(counts(read_stdin()), nil);
+    os.exit(0);
+}
+
+let total = { lines: 0, words: 0, bytes: 0 };
+let failed = false;
+for (path in os.args) {
+    try {
+        let c = counts(fs.read(path));
+        show(c, path);
+        for (k in keys(total)) total[k] = total[k] + c[k];
+    } catch (e) {
+        error(e);
+        failed = true;
+    }
+}
+show(total, "total");
+if (failed) os.exit(1);
