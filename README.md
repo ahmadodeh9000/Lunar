@@ -804,6 +804,13 @@ if (name == nil) os.exit(1);           // no input at all
 print "hi, {name}";
 ```
 
+`examples/tools/wc.lunar` puts `string`, `fs`, and `os` together: a small `wc` that counts lines, words, and bytes in files or standard input.
+
+```bash
+./lunar examples/tools/wc.lunar README.md src/vm.c
+printf 'one two\nthree\n' | ./lunar examples/tools/wc.lunar
+```
+
 ---
 
 ## Foreign Function Interface (FFI)
