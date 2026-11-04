@@ -591,6 +591,8 @@ fn factorial(n) {
 print factorial(10);   // 3628800
 ```
 
+Up to 1024 calls can be active at once. The next one raises `Stack overflow.`, which you can catch. When an uncaught error comes from deep recursion, its stack trace shows a run of identical lines 3 times and then `... repeated N more times`.
+
 ---
 
 ### Errors
