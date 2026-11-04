@@ -505,6 +505,26 @@ InterpretResult interpret(const char* src, const char* path) {
     return run_catching();
 }
 
+// How run() goes from one instruction to the next. With GCC and clang each handler
+// jumps straight to the next one's label through dispatch_table ("computed goto"),
+// which the CPU predicts better than one shared switch. Other compilers, trace
+// builds, and -DLUNAR_NO_COMPUTED_GOTO use the switch. In the goto version run()
+// isn't a loop, so a handler that ends in break instead of NEXT doesn't compile.
+#if defined(__GNUC__) && !defined(LUNAR_NO_COMPUTED_GOTO) && !defined(LUNAR_DEBUG_TRACE_EXECUTION)
+#define LUNAR_COMPUTED_GOTO
+#define DISPATCH_LOOP
+#define DISPATCH_SWITCH     NEXT;
+#define CASE(op)            L_##op
+#define CASE_DEFAULT        L_unknown
+#define NEXT                goto *dispatch_table[READ_BYTE()]
+#else
+#define DISPATCH_LOOP       for(;;)
+#define DISPATCH_SWITCH     switch(READ_BYTE())
+#define CASE(op)            case op
+#define CASE_DEFAULT        default
+#define NEXT                break
+#endif
+
 static InterpretResult run() {
     CallFrame* frame;
     Table* globals;     // the current function's module globals
@@ -529,72 +549,91 @@ static InterpretResult run() {
 
     Value k;    // the constant operand; OP_WIDE loads it and jumps to the opcode's label
 
-    for(;;){
+#ifdef LUNAR_COMPUTED_GOTO
+    // every byte that isn't an opcode goes to the "Unknown opcode" handler
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winitializer-overrides"
+#else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverride-init"
+#endif
+#define DISPATCH_ENTRY(op) [op]=&&L_##op,
+    static void* dispatch_table[256]={ [0 ... 255]=&&L_unknown, LUNAR_OPCODES(DISPATCH_ENTRY) };
+#undef DISPATCH_ENTRY
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#else
+#pragma GCC diagnostic pop
+#endif
+#endif
+
+    DISPATCH_LOOP {
 #ifdef LUNAR_DEBUG_TRACE_EXECUTION
         printf("          ");
         for(Value* s=lvm.stack;s<lvm.stack_top;s++){ printf("[ "); printValue(*s); printf(" ]"); }
         printf("\n");
         disassemble_instruction(&frame->closure->function->chunk,(int)(frame->ip-frame->closure->function->chunk.code));
 #endif
-        switch(READ_BYTE()){
-            case OP_CONST:   k=READ_CONST(); op_const: push(k); break;
-            case OP_NIL:     push(NIL_VAL); break;
-            case OP_TRUE:    push(BOOL_VAL(true)); break;
-            case OP_FALSE:   push(BOOL_VAL(false)); break;
-            case OP_POP:     pop(); break;
-            case OP_GET_LOCAL:  push(frame->slots[READ_BYTE()]); break;
-            case OP_SET_LOCAL:  frame->slots[READ_BYTE()]=peek(0); break;
-            case OP_DEFINE_GLOBAL: k=READ_CONST(); op_define_global: { ObjString* n=AS_STRING(k); table_set(globals,n,peek(0)); pop(); break; }
-            case OP_GET_GLOBAL: k=READ_CONST(); op_get_global: {
+        DISPATCH_SWITCH {
+            CASE(OP_CONST):   k=READ_CONST(); op_const: push(k); NEXT;
+            CASE(OP_NIL):     push(NIL_VAL); NEXT;
+            CASE(OP_TRUE):    push(BOOL_VAL(true)); NEXT;
+            CASE(OP_FALSE):   push(BOOL_VAL(false)); NEXT;
+            CASE(OP_POP):     pop(); NEXT;
+            CASE(OP_GET_LOCAL):  push(frame->slots[READ_BYTE()]); NEXT;
+            CASE(OP_SET_LOCAL):  frame->slots[READ_BYTE()]=peek(0); NEXT;
+            CASE(OP_DEFINE_GLOBAL): k=READ_CONST(); op_define_global: { ObjString* n=AS_STRING(k); table_set(globals,n,peek(0)); pop(); NEXT; }
+            CASE(OP_GET_GLOBAL): k=READ_CONST(); op_get_global: {
                 ObjString* n=AS_STRING(k); Value v;
                 if(!table_get(globals,n,&v)){ runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
-                push(v); break;
+                push(v); NEXT;
             }
-            case OP_SET_GLOBAL: k=READ_CONST(); op_set_global: {
+            CASE(OP_SET_GLOBAL): k=READ_CONST(); op_set_global: {
                 ObjString* n=AS_STRING(k);
                 if(table_set(globals,n,peek(0))){ table_delete(globals,n); runtime_error("Undefined variable '%s'.",n->chars); return INTERPRET_RUNTIME_ERR; }
-                break;
+                NEXT;
             }
-            case OP_GET_UPVALUE: push(*frame->closure->upvalues[READ_BYTE()]->location); break;
-            case OP_SET_UPVALUE: *frame->closure->upvalues[READ_BYTE()]->location=peek(0); break;
-            case OP_CLOSE_UPVALUE: close_upvalues(lvm.stack_top-1); pop(); break;
-            case OP_NEGATE:
+            CASE(OP_GET_UPVALUE): push(*frame->closure->upvalues[READ_BYTE()]->location); NEXT;
+            CASE(OP_SET_UPVALUE): *frame->closure->upvalues[READ_BYTE()]->location=peek(0); NEXT;
+            CASE(OP_CLOSE_UPVALUE): close_upvalues(lvm.stack_top-1); pop(); NEXT;
+            CASE(OP_NEGATE):
                 if(!IS_NUMBER(peek(0))){ runtime_error("Operand must be a number."); return INTERPRET_RUNTIME_ERR; }
-                push(NUMBER_VAL(-AS_NUMBER(pop()))); break;
-            case OP_ADD:
+                push(NUMBER_VAL(-AS_NUMBER(pop()))); NEXT;
+            CASE(OP_ADD):
                 if(IS_STRING(peek(0))&&IS_STRING(peek(1))){ concatenate(); }
                 else if(IS_NUMBER(peek(0))&&IS_NUMBER(peek(1))){ double b=AS_NUMBER(pop()),a=AS_NUMBER(pop()); push(NUMBER_VAL(a+b)); }
                 else{ runtime_error("Operands must be two numbers or two strings."); return INTERPRET_RUNTIME_ERR; }
-                break;
-            case OP_SUB: BINARY_OP(NUMBER_VAL,-); break;
-            case OP_MUL: BINARY_OP(NUMBER_VAL,*); break;
-            case OP_DIV: BINARY_OP(NUMBER_VAL,/); break;
-            case OP_MOD: BINARY_BITWISE_OP(%); break;
-            case OP_POW: {
+                NEXT;
+            CASE(OP_SUB): BINARY_OP(NUMBER_VAL,-); NEXT;
+            CASE(OP_MUL): BINARY_OP(NUMBER_VAL,*); NEXT;
+            CASE(OP_DIV): BINARY_OP(NUMBER_VAL,/); NEXT;
+            CASE(OP_MOD): BINARY_BITWISE_OP(%); NEXT;
+            CASE(OP_POW): {
                 if(!IS_NUMBER(peek(0))||!IS_NUMBER(peek(1))){ runtime_error("Operands must be numbers."); return INTERPRET_RUNTIME_ERR; }
                 double e=AS_NUMBER(pop()),b=AS_NUMBER(pop()),r;
                 if(e==0.0) r=1.0; else if(b==0.0) r=0.0; else if(e==2.0) r=b*b;
                 else if(e==0.5) r=sqrt(b); else if(b<0.0&&e!=(i32)e) r=NAN;
                 else r=pow(b,e);
-                push(NUMBER_VAL(r)); break;
+                push(NUMBER_VAL(r)); NEXT;
             }
-            case OP_BITWISE_AND:        BINARY_BITWISE_OP(&);  break;
-            case OP_BITWISE_OR:         BINARY_BITWISE_OP(|);  break;
-            case OP_BITWISE_XOR:        BINARY_BITWISE_OP(^);  break;
-            case OP_BITWISE_LEFTSHIFT:  BINARY_BITWISE_OP(<<); break;
-            case OP_BITWISE_RIGHTSHIFT: BINARY_BITWISE_OP(>>); break;
-            case OP_BITWISE_NOT:
+            CASE(OP_BITWISE_AND):        BINARY_BITWISE_OP(&);  NEXT;
+            CASE(OP_BITWISE_OR):         BINARY_BITWISE_OP(|);  NEXT;
+            CASE(OP_BITWISE_XOR):        BINARY_BITWISE_OP(^);  NEXT;
+            CASE(OP_BITWISE_LEFTSHIFT):  BINARY_BITWISE_OP(<<); NEXT;
+            CASE(OP_BITWISE_RIGHTSHIFT): BINARY_BITWISE_OP(>>); NEXT;
+            CASE(OP_BITWISE_NOT):
                 if(!IS_NUMBER(peek(0))){ runtime_error("Operand must be a number."); return INTERPRET_RUNTIME_ERR; }
-                push(NUMBER_VAL((double)(~(i32)AS_NUMBER(pop())))); break;
-            case OP_NOT:     push(BOOL_VAL(is_falsey(pop()))); break;
-            case OP_EQU:     { Value b=pop(),a=pop(); push(BOOL_VAL(values_equ(a,b))); break; }
-            case OP_GREATER: BINARY_OP(BOOL_VAL,>); break;
-            case OP_LESS:    BINARY_OP(BOOL_VAL,<); break;
-            case OP_PRINT:   printValue(pop()); printf("\n"); break;
-            case OP_JUMP:          { u16 o=READ_SHORT(); frame->ip+=o; break; }
-            case OP_JUMP_IF_FALSE: { u16 o=READ_SHORT(); if(is_falsey(peek(0))) frame->ip+=o; break; }
-            case OP_LOOP:          { u16 o=READ_SHORT(); frame->ip-=o; break; }
-            case OP_CLOSURE: k=READ_CONST(); op_closure: {
+                push(NUMBER_VAL((double)(~(i32)AS_NUMBER(pop())))); NEXT;
+            CASE(OP_NOT):     push(BOOL_VAL(is_falsey(pop()))); NEXT;
+            CASE(OP_EQU):     { Value b=pop(),a=pop(); push(BOOL_VAL(values_equ(a,b))); NEXT; }
+            CASE(OP_GREATER): BINARY_OP(BOOL_VAL,>); NEXT;
+            CASE(OP_LESS):    BINARY_OP(BOOL_VAL,<); NEXT;
+            CASE(OP_PRINT):   printValue(pop()); printf("\n"); NEXT;
+            CASE(OP_JUMP):          { u16 o=READ_SHORT(); frame->ip+=o; NEXT; }
+            CASE(OP_JUMP_IF_FALSE): { u16 o=READ_SHORT(); if(is_falsey(peek(0))) frame->ip+=o; NEXT; }
+            CASE(OP_LOOP):          { u16 o=READ_SHORT(); frame->ip-=o; NEXT; }
+            CASE(OP_CLOSURE): k=READ_CONST(); op_closure: {
                 ObjFunction* fn=AS_FUNCTION(k);
                 ObjClosure* closure=new_closure(fn);
                 push(OBJ_VAL(closure));
@@ -602,9 +641,9 @@ static InterpretResult run() {
                     u8 is_local=READ_BYTE(),index=READ_BYTE();
                     closure->upvalues[i]=is_local?capture_upvalue(frame->slots+index):frame->closure->upvalues[index];
                 }
-                break;
+                NEXT;
             }
-            case OP_BUILD_ARRAY: {
+            CASE(OP_BUILD_ARRAY): {
                 int n = READ_BYTE();
                 ObjArray* array = new_array();
                 push(OBJ_VAL(array));                 // root it: write_value_array can trigger GC
@@ -614,10 +653,10 @@ static InterpretResult run() {
                 Value result = pop();                 // the array
                 lvm.stack_top -= n;                   // drop the elements
                 push(result);
-                break;
+                NEXT;
             }
 
-            case OP_BUILD_MAP: {
+            CASE(OP_BUILD_MAP): {
                 int n = READ_BYTE();
                 ObjMap* map = new_map();
                 push(OBJ_VAL(map));                   // root it: map_set can trigger GC
@@ -625,22 +664,22 @@ static InterpretResult run() {
                 Value result = pop();                 // the map
                 lvm.stack_top -= 2*n;                 // drop the pairs
                 push(result);
-                break;
+                NEXT;
             }
 
-            case OP_APPEND_MAP: {
+            CASE(OP_APPEND_MAP): {
                 int n = READ_BYTE();
                 ObjMap* map = AS_MAP(peek(2*n));
                 if (!add_map_pairs(map, lvm.stack_top - 2*n, n)) return INTERPRET_RUNTIME_ERR;
                 lvm.stack_top -= 2*n;                 // drop the pairs, keep the map
-                break;
+                NEXT;
             }
 
             // for-in: the collection is on top; push the items the loop walks
-            case OP_ITER_PREP: {
+            CASE(OP_ITER_PREP): {
                 int nvars = READ_BYTE();
                 Value seq = peek(0);
-                if (IS_ARRAY(seq)) { push(seq); break; }        // walked live, no copy
+                if (IS_ARRAY(seq)) { push(seq); NEXT; }        // walked live, no copy
                 if (IS_MAP(seq)) {
                     ObjMap* m = AS_MAP(seq);
                     ObjArray* items = new_array();                // seq is still on the stack
@@ -648,7 +687,7 @@ static InterpretResult run() {
                         if (!IS_NIL(m->entries[i].key)) write_value_array(&items->items, m->entries[i].key);
                     }
                     push(OBJ_VAL(items));
-                    break;
+                    NEXT;
                 }
                 if (IS_STRING(seq)) {
                     if (nvars == 2) {
@@ -663,14 +702,14 @@ static InterpretResult run() {
                         write_value_array(&items->items, OBJ_VAL(copy_str(s->chars + i, n)));
                         i += n;
                     }
-                    break;
+                    NEXT;
                 }
                 runtime_error("Can only loop over arrays, maps, and strings.");
                 return INTERPRET_RUNTIME_ERR;
             }
 
             // for-in step: slots base, base+1, base+2 hold the collection, items, and position
-            case OP_FOR_ITER: {
+            CASE(OP_FOR_ITER): {
                 Value* base = frame->slots + READ_BYTE();
                 int nvars   = READ_BYTE();
                 u16 exit    = READ_SHORT();
@@ -679,37 +718,37 @@ static InterpretResult run() {
                 if (IS_MAP(base[0])) {
                     Value v;
                     while (i < items->items.count && !map_get(AS_MAP(base[0]), items->items.values[i], &v)) i++;   // removed since
-                    if (i >= items->items.count) { frame->ip += exit; break; }
+                    if (i >= items->items.count) { frame->ip += exit; NEXT; }
                     base[2] = NUMBER_VAL(i + 1);
                     push(items->items.values[i]);
                     if (nvars == 2) push(v);
-                    break;
+                    NEXT;
                 }
-                if (i >= items->items.count) { frame->ip += exit; break; }   // arrays: length checked live
+                if (i >= items->items.count) { frame->ip += exit; NEXT; }   // arrays: length checked live
                 base[2] = NUMBER_VAL(i + 1);
                 if (nvars == 2) push(NUMBER_VAL(i));
                 push(items->items.values[i]);
-                break;
+                NEXT;
             }
 
-            case OP_TRY: {
+            CASE(OP_TRY): {
                 u16 o=READ_SHORT();
                 if(lvm.handler_count==HANDLERS_MAX){ runtime_error("Too many nested try blocks."); return INTERPRET_RUNTIME_ERR; }
                 Handler* h=&lvm.handlers[lvm.handler_count++];
                 h->frame_count=lvm.frame_count; h->stack_top=lvm.stack_top; h->catch_ip=frame->ip+o;
-                break;
+                NEXT;
             }
-            case OP_POP_HANDLER: lvm.handler_count--; break;
-            case OP_BUILD_STRING: {
+            CASE(OP_POP_HANDLER): lvm.handler_count--; NEXT;
+            CASE(OP_BUILD_STRING): {
                 int n = READ_BYTE();
                 ObjString* joined = join_parts(lvm.stack_top - n, n);
                 lvm.stack_top -= n;
                 push(OBJ_VAL(joined));
-                break;
+                NEXT;
             }
-            case OP_THROW: lvm.error_value=pop(); lvm.error_pending=true; return INTERPRET_RUNTIME_ERR;
+            CASE(OP_THROW): lvm.error_value=pop(); lvm.error_pending=true; return INTERPRET_RUNTIME_ERR;
 
-            case OP_GET_INDEX: {
+            CASE(OP_GET_INDEX): {
                 if (!IS_ARRAY(peek(1))) {
                     if (IS_MAP(peek(1))) {
                         const char* err = map_key_error(peek(0));
@@ -718,7 +757,7 @@ static InterpretResult run() {
                         if (!map_get(AS_MAP(peek(1)), peek(0), &v)) v = NIL_VAL;   // missing key
                         pop(); pop();
                         push(v);
-                        break;
+                        NEXT;
                     }
                     runtime_error("Only arrays and maps can be indexed.");
                     return INTERPRET_RUNTIME_ERR;
@@ -736,10 +775,10 @@ static InterpretResult run() {
                 Value v = array->items.values[(i32)d];
                 pop(); pop();
                 push(v);
-                break;
+                NEXT;
             }
             
-            case OP_SET_INDEX: {
+            CASE(OP_SET_INDEX): {
                 if (!IS_ARRAY(peek(2))) {
                     if (IS_MAP(peek(2))) {
                         const char* err = map_key_error(peek(1));
@@ -748,7 +787,7 @@ static InterpretResult run() {
                         Value v = pop();
                         pop(); pop();
                         push(v);                      // assignment is an expression
-                        break;
+                        NEXT;
                     }
                     runtime_error("Only arrays and maps can be indexed.");
                     return INTERPRET_RUNTIME_ERR;
@@ -767,23 +806,23 @@ static InterpretResult run() {
                 Value v = pop();
                 pop(); pop();
                 push(v);                              // assignment is an expression
-                break;
+                NEXT;
             }
 
-            case OP_CALL: {
+            CASE(OP_CALL): {
                 int argc=READ_BYTE();
                 if(!call_value(peek(argc),argc)) return INTERPRET_RUNTIME_ERR;
-                LOAD_FRAME(); break;
+                LOAD_FRAME(); NEXT;
             }
-            case OP_RET: {
+            CASE(OP_RET): {
                 Value result=pop(); close_upvalues(frame->slots);
                 lvm.frame_count--;
                 if(lvm.frame_count==0){ pop(); return INTERPRET_OK; }
                 lvm.stack_top=frame->slots; push(result);
-                LOAD_FRAME(); break;
+                LOAD_FRAME(); NEXT;
             }
             // the end of a file's top-level code: the end of the script, or of an import
-            case OP_MODULE_RET: {
+            CASE(OP_MODULE_RET): {
                 Value result=pop(); close_upvalues(frame->slots);
                 lvm.frame_count--;
                 if(lvm.frame_count==0){ pop(); return INTERPRET_OK; }
@@ -791,69 +830,69 @@ static InterpretResult run() {
                 m->exports=result; m->loaded=true;
                 lvm.loading_count--;
                 lvm.stack_top=frame->slots; push(result);
-                LOAD_FRAME(); break;
+                LOAD_FRAME(); NEXT;
             }
-            case OP_IMPORT:
+            CASE(OP_IMPORT):
                 if(!import_module(frame->closure->function->module)) return INTERPRET_RUNTIME_ERR;
-                LOAD_FRAME(); break;
-            case OP_STRUCT: k=READ_CONST(); op_struct: push(OBJ_VAL(new_struct(AS_STRING(k)))); break;
-            case OP_GET_PROPERTY: k=READ_CONST(); op_get_property: {
+                LOAD_FRAME(); NEXT;
+            CASE(OP_STRUCT): k=READ_CONST(); op_struct: push(OBJ_VAL(new_struct(AS_STRING(k)))); NEXT;
+            CASE(OP_GET_PROPERTY): k=READ_CONST(); op_get_property: {
                 if(!IS_INSTANCE(peek(0))){
                     if(IS_MAP(peek(0))){    // m.key is m["key"]; a missing key is nil
                         Value val; if(!map_get(AS_MAP(peek(0)),k,&val)) val=NIL_VAL;
-                        pop(); push(val); break;
+                        pop(); push(val); NEXT;
                     }
                     runtime_error("Only instances and maps have properties."); return INTERPRET_RUNTIME_ERR;
                 }
                 ObjInstance* inst=AS_INSTANCE(peek(0)); ObjString* name=AS_STRING(k);
                 Value val;
-                if(table_get(inst->fields,name,&val)){ pop(); push(val); break; }
+                if(table_get(inst->fields,name,&val)){ pop(); push(val); NEXT; }
                 if(!bind_method(inst->klass,name)) return INTERPRET_RUNTIME_ERR;
-                break;
+                NEXT;
             }
-            case OP_SET_PROPERTY: k=READ_CONST(); op_set_property: {
+            CASE(OP_SET_PROPERTY): k=READ_CONST(); op_set_property: {
                 if(!IS_INSTANCE(peek(1))){
                     if(IS_MAP(peek(1))){    // m.key = v is m["key"] = v
                         map_set(AS_MAP(peek(1)),k,peek(0));
-                        Value val=pop(); pop(); push(val); break;
+                        Value val=pop(); pop(); push(val); NEXT;
                     }
                     runtime_error("Only instances and maps have fields."); return INTERPRET_RUNTIME_ERR;
                 }
                 ObjInstance* inst=AS_INSTANCE(peek(1)); ObjString* name=AS_STRING(k);
                 table_set(inst->fields,name,peek(0));
-                Value val=pop(); pop(); push(val); break;
+                Value val=pop(); pop(); push(val); NEXT;
             }
-            case OP_METHOD: k=READ_CONST(); op_method: define_method(AS_STRING(k)); break;
-            case OP_INVOKE: k=READ_CONST(); op_invoke: {
+            CASE(OP_METHOD): k=READ_CONST(); op_method: define_method(AS_STRING(k)); NEXT;
+            CASE(OP_INVOKE): k=READ_CONST(); op_invoke: {
                 ObjString* method=AS_STRING(k); int argc=READ_BYTE();
                 if(!invoke(method,argc)) return INTERPRET_RUNTIME_ERR;
-                LOAD_FRAME(); break;
+                LOAD_FRAME(); NEXT;
             }
-            case OP_INHERIT: {
+            CASE(OP_INHERIT): {
                 if(!IS_STRUCT(peek(1))){ runtime_error("Supertype must be a struct."); return INTERPRET_RUNTIME_ERR; }
                 ObjStruct* sup=AS_STRUCT(peek(1)); ObjStruct* sub=AS_STRUCT(peek(0));
-                table_add_all(sup->methods,sub->methods); pop(); break;
+                table_add_all(sup->methods,sub->methods); pop(); NEXT;
             }
-            case OP_GET_SUPER: k=READ_CONST(); op_get_super: {
+            CASE(OP_GET_SUPER): k=READ_CONST(); op_get_super: {
                 ObjString* name=AS_STRING(k); ObjStruct* sup=AS_STRUCT(pop());
                 if(!bind_method(sup,name)) return INTERPRET_RUNTIME_ERR;
-                break;
+                NEXT;
             }
-            case OP_SUPER_INVOKE: k=READ_CONST(); op_super_invoke: {
+            CASE(OP_SUPER_INVOKE): k=READ_CONST(); op_super_invoke: {
                 ObjString* method=AS_STRING(k); int argc=READ_BYTE(); ObjStruct* sup=AS_STRUCT(pop());
                 if(!invoke_from_class(sup,method,argc)) return INTERPRET_RUNTIME_ERR;
-                LOAD_FRAME(); break;
+                LOAD_FRAME(); NEXT;
             }
-            case OP_APPEND_ARRAY: {
+            CASE(OP_APPEND_ARRAY): {
                 int n = READ_BYTE();
                 ObjArray* array = AS_ARRAY(peek(n));
                 for (int i = 0; i < n; i++) {
                     write_value_array(&array->items, peek(n - 1 - i));  // peek(n-1) = first element
                 }
                 lvm.stack_top -= n;                   // drop the elements, keep the array
-                break;
+                NEXT;
             }
-            case OP_WIDE: {
+            CASE(OP_WIDE): {
                 u8 op=READ_BYTE();
                 k=frame->closure->function->chunk.constants.values[READ_24()];
                 switch(op){
@@ -874,7 +913,7 @@ static InterpretResult run() {
                         return INTERPRET_RUNTIME_ERR;
                 }
             }
-            default:
+            CASE_DEFAULT:
                 fprintf(stderr,"Unknown opcode: %d\n",*(frame->ip-1));
                 return INTERPRET_RUNTIME_ERR;
         }
@@ -886,4 +925,9 @@ static InterpretResult run() {
 #undef READ_CONST
 #undef BINARY_OP
 #undef BINARY_BITWISE_OP
+#undef DISPATCH_LOOP
+#undef DISPATCH_SWITCH
+#undef CASE
+#undef CASE_DEFAULT
+#undef NEXT
 }
