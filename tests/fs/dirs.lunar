@@ -1,0 +1,37 @@
+// exists, is_dir, mkdir, list, and remove.
+let fs = import("fs");
+let clean = import("lib/clean.lunar");
+let dir = clean.fresh("dirs");
+
+print fs.exists(dir);
+print fs.is_dir(dir);
+print fs.exists(dir + "/missing");
+print fs.is_dir(dir + "/missing");
+
+fs.write(dir + "/file.txt", "x");
+print fs.exists(dir + "/file.txt");
+print fs.is_dir(dir + "/file.txt");
+
+// mkdir makes parents, and is quiet when the folder is already there
+print fs.mkdir(dir + "/a/b/c");
+print fs.is_dir(dir + "/a/b/c");
+fs.mkdir(dir + "/a/b/c");
+fs.mkdir(dir + "/a/b/");
+fs.mkdir(dir + "//a//b");
+
+// list is sorted by bytes, includes hidden files, and skips . and ..
+fs.write(dir + "/b.txt", "");
+fs.write(dir + "/Z.txt", "");
+fs.write(dir + "/.hidden", "");
+fs.write(dir + "/a.txt", "");
+print fs.list(dir);
+print fs.list(dir + "/a/b/c");
+
+// remove takes a file or an empty folder
+print fs.remove(dir + "/file.txt");
+print fs.exists(dir + "/file.txt");
+fs.remove(dir + "/a/b/c");
+print fs.list(dir + "/a/b");
+
+clean.finish(dir);
+print fs.exists(dir);

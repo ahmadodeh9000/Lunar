@@ -1,0 +1,13 @@
+wipe() refuses to delete "tests/fs/lib/clean.lunar": only paths inside tests/fs/tmp/ can be deleted.
+wipe() refuses to delete "tests/fs": only paths inside tests/fs/tmp/ can be deleted.
+wipe() refuses to delete "tests/fs/tmp": only paths inside tests/fs/tmp/ can be deleted.
+wipe() refuses to delete "tests/fs/tmp/": only paths inside tests/fs/tmp/ can be deleted.
+wipe() refuses to delete "tests/fs/tmp/../lib": only paths inside tests/fs/tmp/ can be deleted.
+wipe() refuses to delete "tests/fs/tmp/x/../../lib": only paths inside tests/fs/tmp/ can be deleted.
+wipe() refuses to delete "/tmp": only paths inside tests/fs/tmp/ can be deleted.
+wipe() refuses to delete "": only paths inside tests/fs/tmp/ can be deleted.
+true
+deleted tests/fs/tmp/cleanup/f
+deleted tests/fs/tmp/cleanup/never-existed
+-- stderr --
+-- exit 0 --

@@ -1,0 +1,14 @@
+nil
+hello
+nil
+hello, world
+hi
+made by append
+0
+true
+10
+0
+true
+false
+-- stderr --
+-- exit 0 --

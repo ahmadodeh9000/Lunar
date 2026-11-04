@@ -1,0 +1,25 @@
+// lines strips "\n" and "\r\n"; a lone "\r" stays.
+let fs = import("fs");
+let string = import("string");
+let CR = string.from_byte(13);
+let clean = import("lib/clean.lunar");
+let dir = clean.fresh("lines");
+let f = dir + "/t.txt";
+
+fn show(text) {
+    fs.write(f, text);
+    let out = fs.lines(f);
+    print str(len(out)) + " " + string.replace(str(out), CR, "\\r");   // a kept \r shows as \r
+}
+show("a\nb\nc");
+show("a\nb\nc\n");
+show("a" + CR + "\nb" + CR + "\n");
+show("a" + CR + "b\n");
+show("a\n\nb");
+show("\n");
+show("\n\n");
+show("");
+show("no newline");
+show(CR + "\n");
+
+clean.finish(dir);

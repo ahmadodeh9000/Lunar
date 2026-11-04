@@ -1,0 +1,33 @@
+fs.read() can't read "tests/fs/tmp/errors/missing.txt": No such file or directory.
+fs.read() can't read "tests/fs/tmp/errors": Is a directory.
+fs.lines() can't read "tests/fs/tmp/errors/missing.txt": No such file or directory.
+fs.write() can't write "tests/fs/tmp/errors/no/such/dir.txt": No such file or directory.
+fs.write() can't write "tests/fs/tmp/errors": Is a directory.
+fs.append() can't write "tests/fs/tmp/errors/no/such/dir.txt": No such file or directory.
+fs.list() can't list "tests/fs/tmp/errors/file.txt": Not a directory.
+fs.list() can't list "tests/fs/tmp/errors/missing": No such file or directory.
+fs.remove() can't remove "tests/fs/tmp/errors/missing": No such file or directory.
+fs.remove() can't remove "tests/fs/tmp/errors/full": Directory not empty.
+fs.mkdir() can't create "tests/fs/tmp/errors/file.txt": File exists.
+fs.mkdir() can't create "tests/fs/tmp/errors/file.txt/sub": Not a directory.
+fs.mkdir() can't create "": No such file or directory.
+fs.read() can't read "": No such file or directory.
+fs.read() takes 1 argument (got 0).
+fs.read() expects a string for argument 1 (got number).
+fs.read() path can't contain a NUL byte.
+fs.write() takes 2 arguments (got 1).
+fs.write() expects a string for argument 2 (got number).
+fs.write() path can't contain a NUL byte.
+fs.append() expects a string for argument 2 (got nil).
+fs.exists() takes 1 argument (got 0).
+fs.exists() expects a string for argument 1 (got array).
+fs.is_dir() path can't contain a NUL byte.
+fs.list() takes 1 argument (got 2).
+fs.remove() expects a string for argument 1 (got nil).
+fs.mkdir() expects a string for argument 1 (got bool).
+fs.lines() expects a string for argument 1 (got map).
+false
+-- stderr --
+fs.read() can't read "tests/fs/tmp/errors/gone.txt": No such file or directory.
+[line 44] in script
+-- exit 100 --

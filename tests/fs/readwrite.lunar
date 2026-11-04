@@ -1,0 +1,33 @@
+// read, write, and append move bytes unchanged.
+let fs = import("fs");
+let string = import("string");
+let clean = import("lib/clean.lunar");
+let dir = clean.fresh("readwrite");
+let f = dir + "/a.txt";
+
+print fs.write(f, "hello");
+print fs.read(f);
+print fs.append(f, ", world");
+print fs.read(f);
+fs.write(f, "hi");                      // write truncates
+print fs.read(f);
+
+fs.append(dir + "/new.txt", "made by append");
+print fs.read(dir + "/new.txt");
+
+fs.write(f, "");
+print len(fs.read(f));
+
+let bytes = "a" + string.from_byte(0) + "b" + string.from_byte(255) + "ñ🚀";
+fs.write(f, bytes);
+let back = fs.read(f);
+print back == bytes;
+print len(back);
+print string.byte(back, 1);
+
+let big = string.repeat("0123456789", 100000);
+fs.write(f, big);
+print fs.read(f) == big;
+
+clean.finish(dir);
+print fs.exists(dir);

@@ -9,5 +9,6 @@ bool import_builtin(ObjString* name);
 
 // Built-in modules: each fills the map that import("name") returns.
 void open_string_module(ObjMap* map);
+void open_fs_module(ObjMap* map);
 
 #endif

@@ -1,0 +1,36 @@
+// Symlinks, made through the FFI since fs has no symlink().
+let fs = import("fs");
+let clean = import("lib/clean.lunar");
+let dir = clean.fresh("symlink");
+let symlink = cbind(clib(""), "symlink", "int", "string", "string");
+
+fs.mkdir(dir + "/target");
+fs.write(dir + "/target/inner.txt", "inside");
+print symlink("target", dir + "/link");
+
+// exists, is_dir, list, and read follow the link; list shows the link's own name
+print fs.exists(dir + "/link");
+print fs.is_dir(dir + "/link");
+print fs.list(dir);
+print fs.list(dir + "/link");
+print fs.read(dir + "/link/inner.txt");
+
+// remove deletes the link, not the folder it points to
+fs.remove(dir + "/link");
+print fs.exists(dir + "/link");
+print fs.list(dir + "/target");
+
+// a broken link: exists and is_dir follow it, so both are false
+symlink("nowhere", dir + "/broken");
+print fs.exists(dir + "/broken");
+print fs.list(dir);
+
+// the cleanup helper deletes links without following them
+fs.mkdir(dir + "/inner");
+symlink("../target", dir + "/inner/link");
+clean.wipe(dir + "/inner");
+print fs.exists(dir + "/inner");
+print fs.read(dir + "/target/inner.txt");
+
+clean.finish(dir);
+print fs.exists(dir);

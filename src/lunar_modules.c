@@ -19,6 +19,7 @@ void define_module_native(ObjMap* map, const char* name, NativeFn fn) {
 // the modules import("name") opens, each once; their maps are shared by every importer
 static const struct { const char* name; void (*open)(ObjMap*); } builtin_modules[] = {
     { "string", open_string_module },
+    { "fs",     open_fs_module },
 };
 
 // import("name"): the name is on top of the stack, and is replaced by the module's map

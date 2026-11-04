@@ -1,0 +1,40 @@
+// Test cleanup. wipe(path) deletes a file or a whole folder, but only under
+// tests/fs/tmp/: anything else throws. A symlink is deleted, never followed.
+let fs = import("fs");
+let string = import("string");
+let ROOT = "tests/fs/tmp/";
+
+fn check_inside(path) {
+    if (!string.starts_with(path, ROOT) || len(path) == len(ROOT) || string.contains(path, "..")) {
+        throw "wipe() refuses to delete \"" + path + "\": only paths inside " + ROOT + " can be deleted.";
+    }
+}
+
+fn wipe(path) {
+    check_inside(path);
+    // remove() takes files, symlinks, and empty folders; only a full folder is left
+    try { fs.remove(path); ret nil; } catch (e) {
+        if (!fs.is_dir(path)) {
+            if (!fs.exists(path)) ret nil;
+            throw e;
+        }
+    }
+    for (name in fs.list(path)) wipe(path + "/" + name);
+    fs.remove(path);
+}
+
+// a fresh, empty folder for one test
+fn fresh(name) {
+    let dir = ROOT + name;
+    wipe(dir);
+    fs.mkdir(dir);
+    ret dir;
+}
+
+// deletes a test's folder, and tmp/ too once nothing else is in it
+fn finish(dir) {
+    wipe(dir);
+    if (len(fs.list(ROOT)) == 0) fs.remove(ROOT);
+}
+
+ret { wipe: wipe, fresh: fresh, finish: finish };

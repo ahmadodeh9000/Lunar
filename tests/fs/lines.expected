@@ -1,0 +1,12 @@
+3 [a, b, c]
+3 [a, b, c]
+2 [a, b]
+1 [a\rb]
+3 [a, , b]
+1 []
+2 [, ]
+0 []
+1 [no newline]
+1 []
+-- stderr --
+-- exit 0 --

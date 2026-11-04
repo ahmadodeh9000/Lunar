@@ -1,0 +1,16 @@
+true
+true
+false
+false
+true
+false
+nil
+true
+[.hidden, Z.txt, a, a.txt, b.txt, file.txt]
+[]
+nil
+false
+[]
+false
+-- stderr --
+-- exit 0 --

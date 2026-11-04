@@ -1,0 +1,14 @@
+// Many strings and arrays from fs, so collections happen mid-call under GC stress.
+let fs = import("fs");
+let string = import("string");
+let clean = import("lib/clean.lunar");
+let dir = clean.fresh("gc");
+let total = 0;
+for (let i = 0; i < 60; i = i + 1) {
+    let f = dir + "/f" + str(i % 7) + ".txt";
+    fs.write(f, string.repeat("line " + str(i) + "\n", 5));
+    fs.append(f, "end");
+    total = total + len(fs.lines(f)) + len(fs.read(f)) + len(fs.list(dir));
+}
+print total;
+clean.finish(dir);

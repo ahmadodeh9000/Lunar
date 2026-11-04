@@ -1,0 +1,22 @@
+// The test cleanup helper refuses to delete anything outside tests/fs/tmp/.
+let fs = import("fs");
+let clean = import("lib/clean.lunar");
+fn try_wipe(path) {
+    try { clean.wipe(path); print "deleted " + path; } catch (e) { print e; }
+}
+try_wipe("tests/fs/lib/clean.lunar");
+try_wipe("tests/fs");
+try_wipe("tests/fs/tmp");
+try_wipe("tests/fs/tmp/");
+try_wipe("tests/fs/tmp/../lib");
+try_wipe("tests/fs/tmp/x/../../lib");
+try_wipe("/tmp");
+try_wipe("");
+print fs.exists("tests/fs/lib/clean.lunar");
+
+// inside tmp/ is fine, including a path that isn't there
+let dir = clean.fresh("cleanup");
+fs.write(dir + "/f", "x");
+try_wipe(dir + "/f");
+try_wipe(dir + "/never-existed");
+clean.finish(dir);

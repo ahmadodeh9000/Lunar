@@ -1,0 +1,15 @@
+0
+true
+true
+[link, target]
+[inner.txt]
+inside
+false
+[inner.txt]
+false
+[broken, target]
+false
+inside
+false
+-- stderr --
+-- exit 0 --

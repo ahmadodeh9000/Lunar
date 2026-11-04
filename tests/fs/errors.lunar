@@ -1,0 +1,44 @@
+// Bad arguments and OS failures throw catchable errors with the reason.
+let fs = import("fs");
+let string = import("string");
+let clean = import("lib/clean.lunar");
+let dir = clean.fresh("errors");
+fs.write(dir + "/file.txt", "x");
+fs.mkdir(dir + "/full/sub");
+
+try { fs.read(dir + "/missing.txt"); } catch (e) { print e; }
+try { fs.read(dir); } catch (e) { print e; }
+try { fs.lines(dir + "/missing.txt"); } catch (e) { print e; }
+try { fs.write(dir + "/no/such/dir.txt", "x"); } catch (e) { print e; }
+try { fs.write(dir, "x"); } catch (e) { print e; }
+try { fs.append(dir + "/no/such/dir.txt", "x"); } catch (e) { print e; }
+try { fs.list(dir + "/file.txt"); } catch (e) { print e; }
+try { fs.list(dir + "/missing"); } catch (e) { print e; }
+try { fs.remove(dir + "/missing"); } catch (e) { print e; }
+try { fs.remove(dir + "/full"); } catch (e) { print e; }
+try { fs.mkdir(dir + "/file.txt"); } catch (e) { print e; }
+try { fs.mkdir(dir + "/file.txt/sub"); } catch (e) { print e; }
+try { fs.mkdir(""); } catch (e) { print e; }
+try { fs.read(""); } catch (e) { print e; }
+
+// argument checks
+let nul = "a" + string.from_byte(0) + "b";
+try { fs.read(); } catch (e) { print e; }
+try { fs.read(1); } catch (e) { print e; }
+try { fs.read(nul); } catch (e) { print e; }
+try { fs.write(dir + "/x.txt"); } catch (e) { print e; }
+try { fs.write(dir + "/x.txt", 5); } catch (e) { print e; }
+try { fs.write(nul, "x"); } catch (e) { print e; }
+try { fs.append(dir + "/x.txt", nil); } catch (e) { print e; }
+try { fs.exists(); } catch (e) { print e; }
+try { fs.exists([]); } catch (e) { print e; }
+try { fs.is_dir(nul); } catch (e) { print e; }
+try { fs.list(dir, dir); } catch (e) { print e; }
+try { fs.remove(nil); } catch (e) { print e; }
+try { fs.mkdir(true); } catch (e) { print e; }
+try { fs.lines({}); } catch (e) { print e; }
+print fs.exists(dir + "/x.txt");        // the failed writes made nothing
+
+clean.finish(dir);
+// an uncaught one reports the line and exits
+fs.read("tests/fs/tmp/errors/gone.txt");
