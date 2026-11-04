@@ -1,3 +1,6 @@
+// Not a standalone script: run it with
+//     sh examples/minecraft/run_tests.sh [path to lunar]
+// which places these tests inside minecraft.lunar's game(), where its functions live.
 
 // ---------- tests, placed inside game() by run_tests.sh ----------
 
