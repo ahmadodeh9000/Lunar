@@ -4,7 +4,8 @@ The official benchmark check: the current ./lunar against a fresh build of
 another git ref (main by default), run side by side.
 
 Each benchmark runs 15 times per binary, alternating between the two so both
-see the same machine conditions, and the medians are compared. A benchmark
+see the same machine conditions, and the medians are compared. Each time is
+shown as median (min–max, standard deviation). A benchmark
 more than 5% slower is re-run once; it is a regression only if it is still
 more than 5% slower. A benchmark the ref can't run (it uses a newer feature)
 is timed on the current build only. bench/compare.py (the saved baseline) is
@@ -13,9 +14,11 @@ a secondary reference.
 Usage (from the repo root, after `make`):
     python3 bench/ab.py
     python3 bench/ab.py --ref phase-1-2~3 --runs 21
+    python3 bench/ab.py --json times.json     # also save every run's time
 """
 
 import argparse
+import json
 import glob
 import importlib.util
 import os
@@ -70,13 +73,19 @@ def runs_ok(binary, path):
 
 
 def ab(old, new, path, runs):
-    """Medians of `runs` alternating runs of each binary, after one warmup each."""
+    """`runs` alternating runs of each binary, after one warmup each."""
     run(old, path); run(new, path)
     t_old, t_new = [], []
     for _ in range(runs):
         t_old.append(run(old, path))
         t_new.append(run(new, path))
-    return statistics.median(t_old), statistics.median(t_new)
+    return t_old, t_new
+
+
+def describe(times):
+    """median (min–max, σ stddev)"""
+    return (f"{statistics.median(times):.3f} s ({min(times):.3f}–{max(times):.3f}, "
+            f"σ {statistics.stdev(times):.4f})")
 
 
 def main():
@@ -84,30 +93,38 @@ def main():
     ap.add_argument("--ref", default="main", help="git ref to compare against")
     ap.add_argument("--lunar", default=os.path.join(ROOT, "lunar"))
     ap.add_argument("--runs", type=int, default=15)
+    ap.add_argument("--json", help="write every run's time to this file")
     args = ap.parse_args()
 
     tmp = tempfile.mkdtemp()
     try:
         old = build_ref(args.ref, tmp)
         regressions = []
+        raw = {}
         print(f"| Benchmark | {args.ref} | now | Change |\n|---|---|---|---|")
         for name, path in programs(tmp).items():
             if not runs_ok(old, path):
-                m_new = statistics.median(run(args.lunar, path) for _ in range(args.runs))
-                print(f"| {name} | n/a (new) | {m_new:.3f} s | |")
+                t_new = [run(args.lunar, path) for _ in range(args.runs)]
+                raw[name] = {"new": t_new}
+                print(f"| {name} | n/a (new) | {describe(t_new)} | |")
                 continue
-            m_old, m_new = ab(old, args.lunar, path, args.runs)
-            if m_new > m_old * (1 + LIMIT):
-                m_old, m_new = ab(old, args.lunar, path, args.runs)   # re-run once
+            t_old, t_new = ab(old, args.lunar, path, args.runs)
+            if statistics.median(t_new) > statistics.median(t_old) * (1 + LIMIT):
+                t_old, t_new = ab(old, args.lunar, path, args.runs)   # re-run once
+            raw[name] = {"ref": t_old, "new": t_new}
+            m_old, m_new = statistics.median(t_old), statistics.median(t_new)
             change = (m_new - m_old) / m_old
             flag = " **SLOWER**" if change > LIMIT else ""
             if flag:
                 regressions.append(name)
-            print(f"| {name} | {m_old:.3f} s | {m_new:.3f} s | {change:+.1%}{flag} |")
+            print(f"| {name} | {describe(t_old)} | {describe(t_new)} | {change:+.1%}{flag} |")
     finally:
         shutil.rmtree(tmp)
+    if args.json:
+        with open(args.json, "w") as f:
+            json.dump({"ref": args.ref, "runs": args.runs, "times": raw}, f, indent=1)
 
-    print(f"\nMedian of {args.runs} alternating runs each.")
+    print(f"\n{args.runs} alternating runs each: median (min–max, σ standard deviation).")
     if regressions:
         print(f"More than {LIMIT:.0%} slower after a re-run: {', '.join(regressions)}")
         sys.exit(1)
