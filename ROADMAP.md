@@ -21,6 +21,7 @@ Lunar is a small, friendly language for games, tools, and scripts. Each mileston
 - [ ] **P3.3** `os`: args, env, exit, run, time, clock, sleep, platform, cwd, input
 - [ ] `examples/tools/`: a word-count CLI using all three modules
 - [ ] **P3.4** Raise `FRAMES_MAX` from 64 to 1024 and grow the value stack to match, so deeply recursive programs (such as an interpreter written in Lunar) can run. Must not slow down `fib_32` or `method_calls_1m`.
+- [ ] **P3.5** Computed-goto dispatch in `run()` (GCC/clang labels-as-values), falling back to the current switch on other compilers. Done together with P3.4, since both touch `run()`. Goal: faster and more stable benchmarks; report variance as well as medians.
 
 ## Later
 
