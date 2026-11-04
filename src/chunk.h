@@ -4,44 +4,36 @@
 #include "common.h"
 #include "value.h"
 
-// Every opcode, in order. The enum below and run()'s dispatch table are both made
-// from this list, so an opcode can't be left out of either: with computed goto, an
-// opcode that has no handler in run() is a compile error.
-#define LUNAR_OPCODES(X) \
-    X(OP_CONST) \
-    X(OP_NIL) X(OP_TRUE) X(OP_FALSE) \
-    X(OP_POP) \
-    X(OP_GET_LOCAL) X(OP_SET_LOCAL) \
-    X(OP_DEFINE_GLOBAL) X(OP_GET_GLOBAL) X(OP_SET_GLOBAL) \
-    X(OP_GET_UPVALUE) X(OP_SET_UPVALUE) X(OP_CLOSE_UPVALUE) \
-    X(OP_NEGATE) \
-    X(OP_ADD) X(OP_SUB) X(OP_MUL) X(OP_DIV) X(OP_MOD) X(OP_POW) \
-    X(OP_BITWISE_AND) X(OP_BITWISE_OR) X(OP_BITWISE_XOR) \
-    X(OP_BITWISE_NOT) X(OP_BITWISE_LEFTSHIFT) X(OP_BITWISE_RIGHTSHIFT) \
-    X(OP_NOT) \
-    X(OP_EQU) X(OP_GREATER) X(OP_LESS) \
-    X(OP_PRINT) \
-    X(OP_JUMP) X(OP_JUMP_IF_FALSE) X(OP_LOOP) \
-    X(OP_CALL) X(OP_CLOSURE) X(OP_RET) \
-    X(OP_STRUCT) \
-    X(OP_GET_PROPERTY) X(OP_SET_PROPERTY) \
-    X(OP_METHOD) \
-    X(OP_INVOKE) \
-    X(OP_INHERIT) \
-    X(OP_GET_SUPER) X(OP_SUPER_INVOKE) \
-    X(OP_BUILD_ARRAY) X(OP_GET_INDEX) X(OP_SET_INDEX) \
-    X(OP_APPEND_ARRAY) \
-    X(OP_BUILD_MAP) X(OP_APPEND_MAP) \
-    X(OP_ITER_PREP) X(OP_FOR_ITER) \
-    X(OP_TRY) X(OP_POP_HANDLER) X(OP_THROW) \
-    X(OP_BUILD_STRING) \
-    X(OP_IMPORT) X(OP_MODULE_RET) \
-    X(OP_WIDE)      /* prefix: the next opcode's constant index is 3 bytes, not 1 */
-
 typedef enum {
-#define LUNAR_OPCODE_ENUM(op) op,
-    LUNAR_OPCODES(LUNAR_OPCODE_ENUM)
-#undef LUNAR_OPCODE_ENUM
+    OP_CONST,
+    OP_NIL, OP_TRUE, OP_FALSE,
+    OP_POP,
+    OP_GET_LOCAL, OP_SET_LOCAL,
+    OP_DEFINE_GLOBAL, OP_GET_GLOBAL, OP_SET_GLOBAL,
+    OP_GET_UPVALUE, OP_SET_UPVALUE, OP_CLOSE_UPVALUE,
+    OP_NEGATE,
+    OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_POW,
+    OP_BITWISE_AND, OP_BITWISE_OR, OP_BITWISE_XOR,
+    OP_BITWISE_NOT, OP_BITWISE_LEFTSHIFT, OP_BITWISE_RIGHTSHIFT,
+    OP_NOT,
+    OP_EQU, OP_GREATER, OP_LESS,
+    OP_PRINT,
+    OP_JUMP, OP_JUMP_IF_FALSE, OP_LOOP,
+    OP_CALL, OP_CLOSURE, OP_RET,
+    OP_STRUCT,
+    OP_GET_PROPERTY, OP_SET_PROPERTY,
+    OP_METHOD,
+    OP_INVOKE,
+    OP_INHERIT,
+    OP_GET_SUPER, OP_SUPER_INVOKE,
+    OP_BUILD_ARRAY, OP_GET_INDEX, OP_SET_INDEX,
+    OP_APPEND_ARRAY,
+    OP_BUILD_MAP, OP_APPEND_MAP,
+    OP_ITER_PREP, OP_FOR_ITER,
+    OP_TRY, OP_POP_HANDLER, OP_THROW,
+    OP_BUILD_STRING,
+    OP_IMPORT, OP_MODULE_RET,
+    OP_WIDE,        // prefix: the next opcode's constant index is 3 bytes, not 1
 } OpCode;
 
 typedef struct {

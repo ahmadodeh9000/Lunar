@@ -5,6 +5,5 @@ lunar_gcstress
 recordings/*.mov
 lunar_gcstress_quiet
 lunar_asan
-lunar_switch
 *.dSYM/
 tests/fs/tmp/

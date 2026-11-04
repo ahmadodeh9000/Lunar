@@ -21,7 +21,6 @@ DEBUG_TARGET    := $(TARGET_BASE)_debug$(EXE_EXT)
 GCSTRESS_TARGET := $(TARGET_BASE)_gcstress$(EXE_EXT)
 GCQUIET_TARGET  := $(TARGET_BASE)_gcstress_quiet$(EXE_EXT)
 ASAN_TARGET     := $(TARGET_BASE)_asan$(EXE_EXT)
-SWITCH_TARGET   := $(TARGET_BASE)_switch$(EXE_EXT)
 
 # --- dlopen/dlsym ---------------------------------------------------------
 ifeq ($(PLATFORM),linux)
@@ -63,7 +62,7 @@ SRC = src/chunk.c src/compiler.c src/debug.c src/main.c \
 
 SDL_SRC = $(SRC) src/lunar_sdl.c
 
-.PHONY: all debug gc-stress gc-stress-quiet asan switch test sdl clean
+.PHONY: all debug gc-stress gc-stress-quiet asan test sdl clean
 
 all: $(SRC)
 	$(CC) $(CFLAGS) $(FFI_CFLAGS) -O2 -o $(TARGET) $(SRC) $(LIBS) $(FFI_LIBS)
@@ -94,21 +93,14 @@ gc-stress-quiet: $(SRC)
 		-DLUNAR_DEBUG_STRESS_GC \
 		-o $(GCQUIET_TARGET) $(SRC) $(LIBS) $(FFI_LIBS)
 
-# The release build with run()'s plain switch instead of computed goto, as on
-# compilers without labels-as-values
-switch: $(SRC)
-	$(CC) $(CFLAGS) $(FFI_CFLAGS) -O2 -DLUNAR_NO_COMPUTED_GOTO \
-		-o $(SWITCH_TARGET) $(SRC) $(LIBS) $(FFI_LIBS)
-
 asan: $(SRC)
 	$(CC) $(CFLAGS) $(FFI_CFLAGS) -O1 -g -fno-omit-frame-pointer \
 		-fsanitize=address,undefined \
 		-o $(ASAN_TARGET) $(SRC) $(LIBS) $(FFI_LIBS)
 
-# Runs tests/ against the release, switch-dispatch, ASan, and GC-stress builds
-test: all asan gc-stress-quiet switch
+# Runs tests/ against the release, ASan, and GC-stress builds
+test: all asan gc-stress-quiet
 	sh tests/run.sh ./$(TARGET)
-	sh tests/run.sh ./$(SWITCH_TARGET)
 	sh tests/run.sh ./$(ASAN_TARGET)
 	sh tests/run.sh ./$(GCQUIET_TARGET)
 
@@ -117,4 +109,4 @@ sdl: $(SDL_SRC)
 	    -o $(TARGET) $(SDL_SRC) $(shell pkg-config --libs sdl2 SDL2_image) $(LIBS) $(FFI_LIBS)
 
 clean:
-	rm -f $(TARGET) $(DEBUG_TARGET) $(GCSTRESS_TARGET) $(GCQUIET_TARGET) $(ASAN_TARGET) $(SWITCH_TARGET)
+	rm -f $(TARGET) $(DEBUG_TARGET) $(GCSTRESS_TARGET) $(GCQUIET_TARGET) $(ASAN_TARGET)
