@@ -34,7 +34,7 @@ d.speak();
 - **Maps**: insertion-ordered key/value literals, `m[k]` and `m.k` access, `has` / `keys` / `remove`
 - **Error handling**: `throw` any value, `try` / `catch` runtime and built-in errors
 - **Modules**: `import("file.lunar")`, each file with its own globals, run once and cached
-- **Built-in modules**: `import("string")` for splitting, joining, searching, slicing, and case
+- **Built-in modules**: `import("string")` for splitting, joining, searching, slicing, and case; `import("fs")` for files and folders
 - **Strings**: interpolation with `"hp: {hp}"`, and the escapes `\n` `\t` `\"` `\\` `\{`
 - **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
 - **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
@@ -737,6 +737,36 @@ print string.join(string.split(" a  b ", " "), "|");     // |a||b|
 print string.to_number(string.trim(" 12 ")) + 1;        // 13
 ```
 
+### fs
+
+Files and folders. **Relative paths start from the current directory** (where `lunar` was started), not from the script's folder as with `import`. Files are read and written as raw bytes, with no newline translation.
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `read(path)` | `(string) → string` | The whole file |
+| `write(path, text)` | `(string, string) → nil` | Create or empty the file, then write `text` |
+| `append(path, text)` | `(string, string) → nil` | Add `text` to the end, creating the file if needed |
+| `exists(path)` | `(string) → bool` | Whether a file or folder is there |
+| `is_dir(path)` | `(string) → bool` | Whether it's a folder |
+| `list(path)` | `(string) → array` | The names in a folder, sorted, without `.` and `..` |
+| `remove(path)` | `(string) → nil` | Delete a file or an **empty** folder; a symlink is deleted, not what it points to |
+| `mkdir(path)` | `(string) → nil` | Create a folder and any missing parents; fine if it's already there |
+| `lines(path)` | `(string) → array` | The file's lines, without `\n` or `\r\n`; a trailing newline doesn't add an empty line |
+
+`write` and `append` take only strings; use `str(x)` for anything else. When the OS refuses, the error says why, and you can catch it:
+
+```lunar
+let fs = import("fs");
+fs.mkdir("out/logs");
+fs.write("out/logs/today.txt", "started\n");
+fs.append("out/logs/today.txt", "done\n");
+print fs.lines("out/logs/today.txt");   // [started, done]
+print fs.list("out");                   // [logs]
+
+try { fs.read("missing.txt"); } catch (e) { print e; }
+// fs.read() can't read "missing.txt": No such file or directory.
+```
+
 ---
 
 ## Foreign Function Interface (FFI)
@@ -1089,7 +1119,7 @@ Notes:
 ## Known Limitations
 
 - Strings can't be indexed with `s[i]`; use `string.byte` or `string.slice`
-- No file or stdin I/O
+- No stdin I/O
 - Arrays can't be passed to FFI functions yet
 
 ---
