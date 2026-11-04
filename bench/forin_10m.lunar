@@ -1,0 +1,16 @@
+// for-in over a 1M-element array 10 times, and over a 1000-entry map 1000 times.
+fn main() {
+    let a = [];
+    for (let i = 0; i < 1000000; i = i + 1) push(a, i);
+    let total = 0;
+    for (let r = 0; r < 10; r = r + 1) {
+        for (x in a) total = total + x;
+    }
+    let m = {};
+    for (let i = 0; i < 1000; i = i + 1) m["k" + str(i)] = i;
+    for (let r = 0; r < 1000; r = r + 1) {
+        for (k, v in m) total = total + v;
+    }
+    ret total;
+}
+print main();

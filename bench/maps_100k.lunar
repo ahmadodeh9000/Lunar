@@ -1,0 +1,18 @@
+// String and number keys: insert, look up, update, remove. Locals inside a function.
+fn main() {
+    let n = 100000;
+    let keys = [];
+    for (let i = 0; i < n; i = i + 1) push(keys, "k" + str(i));
+    let m = {};
+    for (let i = 0; i < n; i = i + 1) m[keys[i]] = i;
+    let total = 0;
+    for (let r = 0; r < 5; r = r + 1) {
+        for (let i = 0; i < n; i = i + 1) total = total + m[keys[i]];
+    }
+    for (let i = 0; i < n; i = i + 2) remove(m, keys[i]);
+    let ints = {};
+    for (let i = 0; i < n; i = i + 1) ints[i] = i * 2;
+    for (let i = 0; i < n; i = i + 1) total = total + ints[i];
+    ret total + len(m);
+}
+print main();
