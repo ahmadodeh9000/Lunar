@@ -34,6 +34,7 @@ d.speak();
 - **Maps**: insertion-ordered key/value literals, `m[k]` and `m.k` access, `has` / `keys` / `remove`
 - **Error handling**: `throw` any value, `try` / `catch` runtime and built-in errors
 - **Modules**: `import("file.lunar")`, each file with its own globals, run once and cached
+- **Built-in modules**: `import("string")` for splitting, joining, searching, slicing, and case
 - **Strings**: interpolation with `"hp: {hp}"`, and the escapes `\n` `\t` `\"` `\\` `\{`
 - **String interning**: strings deduplicated via an FNV-1a hash table, compared by pointer
 - **Bitwise operators**: `&` `|` `^` `~` `<<` `>>`
@@ -173,6 +174,8 @@ let s = "Hello, " + "Lunar!";
 print len(s);      // 13
 print str(42);     // 42
 ```
+
+`len` counts bytes. To split, search, slice, or change case, use the [`string` module](#string).
 
 Multi-line:
 ```lunar
@@ -650,7 +653,7 @@ print vec.length(vec.add({ x: 1, y: 2 }, { x: 2, y: 2 }));   // 5
 - **Exports** are the value of the file's top-level `ret`; a file without one gives `nil`. `ret` at the top level ends the file, in the main script too.
 - **Errors can be caught:** a missing file (`Can't find module 'x.lunar' (looked for /full/path/x.lunar).`), a circular import (`Circular import: a.lunar -> b.lunar -> a.lunar.`), a compile error in the module, or an error its top-level code raises. A module that fails isn't cached, so importing it again runs it again.
 - Stack traces and compile errors in an imported file name the file, as in `[lib/vec.lunar line 2] in add()`.
-- A name without `/` or `.lunar`, like `import("string")`, is reserved for built-in modules, which don't exist yet.
+- A name without `/` or `.lunar`, like `import("string")`, opens a [built-in module](#built-in-modules). An unknown name raises `No built-in module named 'x' (to import a file, use 'x.lunar').`
 - `import` is a reserved word, and only works as `import(...)`.
 
 See `examples/modules/` for a small multi-file program.
@@ -685,6 +688,54 @@ See `examples/modules/` for a small multi-file program.
 | `random(x,y)` | `(number, number) → number`  | Random integer in the range `[x, y]`                      |
 
 A built-in called with the wrong number or kind of arguments raises an error you can [catch](#errors), such as `sqrt() expects a number for argument 1 (got string).` Results that mean an operation failed are unchanged: `pop` on an empty array and `remove` of a missing key give `nil`.
+
+---
+
+## Built-in Modules
+
+`import("name")` with a plain name gives a map of functions. Each module is opened once, and every file that imports it gets the same map. Call its functions through the map; there's no `self`:
+
+```lunar
+let string = import("string");
+print string.split("a,b,c", ",");   // [a, b, c]
+```
+
+Wrong arguments raise an error you can catch, named after the module, such as `string.split() takes 2 arguments (got 1).`
+
+### string
+
+Strings are bytes, usually UTF-8. `len`, indexes, and slices count **bytes**; `chars`, `char_count`, and `for c in s` walk UTF-8 **characters** (a malformed byte counts as one character). Indexes are whole numbers; where noted, a negative one counts from the end.
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `split(s, sep)` | `(string, string) → array` | Pieces of `s` between each `sep`; `""` splits into characters |
+| `join(a, sep)` | `(array, string) → string` | The strings in `a` with `sep` between them |
+| `find(s, sub, start?)` | `(string, string, number?) → number` | Byte index of the first `sub` at or after `start` (default 0, negative from the end), or `-1` |
+| `contains(s, sub)` | `(string, string) → bool` | Whether `sub` is in `s` |
+| `starts_with(s, p)` | `(string, string) → bool` | Whether `s` begins with `p` |
+| `ends_with(s, p)` | `(string, string) → bool` | Whether `s` ends with `p` |
+| `replace(s, old, new)` | `(string, string, string) → string` | Every `old` replaced with `new`; `old` can't be `""` |
+| `slice(s, start, end)` | `(string, number, number) → string` | Bytes from `start` up to `end`; negative counts from the end, out-of-range ends are clamped |
+| `upper(s)` / `lower(s)` | `(string) → string` | ASCII letters changed to upper or lower case |
+| `trim(s)` | `(string) → string` | ASCII whitespace removed from both ends |
+| `repeat(s, n)` | `(string, number) → string` | `s` repeated `n` times |
+| `chars(s)` | `(string) → array` | The UTF-8 characters of `s` |
+| `char_count(s)` | `(string) → number` | How many UTF-8 characters `s` has |
+| `to_number(s)` | `(string) → number` | A decimal number such as `"42"`, `"-3.5"`, or `"1e3"`, with optional spaces around it; anything else raises an error |
+| `byte(s, i)` | `(string, number) → number` | The byte at index `i`, 0–255; out of range raises an error |
+| `from_byte(n)` | `(number) → string` | A one-byte string from `n`, 0–255 |
+
+```lunar
+let string = import("string");
+let word = "naïve";
+print len(word);                      // 6 (bytes)
+print string.char_count(word);        // 5
+print string.slice("hello", 1, -1);   // ell
+print string.find("hello", "l");      // 2
+print string.replace("a-b-c", "-", "+");                 // a+b+c
+print string.join(string.split(" a  b ", " "), "|");     // |a||b|
+print string.to_number(string.trim(" 12 ")) + 1;        // 13
+```
 
 ---
 
@@ -1037,7 +1088,7 @@ Notes:
 
 ## Known Limitations
 
-- Strings support only `+`, `len`, and `str`: no indexing, slicing, or searching
+- Strings can't be indexed with `s[i]`; use `string.byte` or `string.slice`
 - No file or stdin I/O
 - Arrays can't be passed to FFI functions yet
 
