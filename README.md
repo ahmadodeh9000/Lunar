@@ -1140,17 +1140,31 @@ Frame timings print to the terminal every 2 seconds. Test the game logic without
 <!-- BENCH:START -->
 | Benchmark | Lunar | Lua | Python |
 |---|---|---|---|
-| fib(32) | 0.235 s ± 0.003 | 0.132 s ± 0.004 | 0.263 s ± 0.001 |
-| loop (10M) | 0.362 s ± 0.003 | 0.129 s ± 0.000 | 0.942 s ± 0.113 |
-| array (1M) | 0.095 s ± 0.000 | 0.033 s ± 0.001 | 0.155 s ± 0.008 |
-| method calls (1M) | 0.065 s ± 0.001 | 0.036 s ± 0.001 | 0.087 s ± 0.003 |
-| closures (1M) | 0.052 s ± 0.001 | 0.026 s ± 0.000 | 0.097 s ± 0.003 |
+| fib(32) | 0.219 s ± 0.002 | 0.130 s ± 0.001 | 0.260 s ± 0.002 |
+| loop (10M) | 0.369 s ± 0.001 | 0.129 s ± 0.000 | 0.899 s ± 0.104 |
+| array (1M) | 0.094 s ± 0.002 | 0.032 s ± 0.000 | 0.144 s ± 0.004 |
+| method calls (1M) | 0.063 s ± 0.000 | 0.033 s ± 0.001 | 0.082 s ± 0.001 |
+| closures (1M) | 0.052 s ± 0.000 | 0.025 s ± 0.000 | 0.094 s ± 0.005 |
+| maps (100k keys) | 0.089 s ± 0.001 | 0.046 s ± 0.001 | 0.077 s ± 0.001 |
+| strings (100k lines) | 0.140 s ± 0.001 | 0.149 s ± 0.001 | 0.062 s ± 0.001 |
+| for-in (11M items) | 0.200 s ± 0.001 | 0.238 s ± 0.002 | 0.306 s ± 0.015 |
+| n-body (100k steps) | 0.330 s ± 0.005 | 0.246 s ± 0.010 | 0.402 s ± 0.002 |
 
 Measured on Apple M1 (Darwin arm64), mean of 5 runs ± stddev, wall-clock time including process startup. Lower is better.
 
 Versions: Lunar (local build), Lua 5.4.8, Python 3.14.7.
 
-Reproduce: `python3 bench.py`
+**Lunar over time** (the first five benchmarks; each version built from git with `make`):
+
+| Benchmark | v0.1 (41a15e0) | v0.2.0 | v0.3.0 | now |
+|---|---|---|---|---|
+| fib(32) | 0.235 s ± 0.006 | 0.237 s ± 0.002 | 0.236 s ± 0.003 | 0.220 s ± 0.003 |
+| loop (10M) | 0.366 s ± 0.002 | 0.341 s ± 0.002 | 0.369 s ± 0.001 | 0.371 s ± 0.000 |
+| array (1M) | 0.098 s ± 0.001 | 0.095 s ± 0.000 | 0.096 s ± 0.000 | 0.094 s ± 0.001 |
+| method calls (1M) | 0.065 s ± 0.001 | 0.063 s ± 0.001 | 0.064 s ± 0.001 | 0.063 s ± 0.001 |
+| closures (1M) | 0.056 s ± 0.001 | 0.052 s ± 0.000 | 0.053 s ± 0.001 | 0.052 s ± 0.001 |
+
+Reproduce: `python3 bench/readme.py --update-readme`
 <!-- BENCH:END -->
 
 Notes:
@@ -1158,7 +1172,8 @@ Notes:
 - These are microbenchmarks, so treat the ratios as a rough guide, not a precise measurement.
 - Run times include process startup, which matters most for the shortest benchmarks.
 - The Lunar loop and array programs use top-level (global) variables, which are hash-table lookups in the VM. The Lua versions use locals, and Lua 5.4 also has a native integer type, so part of the gap to Lua comes from how the programs are written.
-- The benchmark programs are generated into `bench/` by `bench.py`.
+- The maps, strings, for-in, and n-body programs do their work inside a function, so all three languages use locals there.
+- The programs are in `bench/` (`name.lunar`, `name.lua`, `name.py`); `bench/readme.py` checks that each language prints the same result.
 
 ---
 
