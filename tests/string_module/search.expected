@@ -1,0 +1,24 @@
+4
+7
+-1
+-1
+0
+5
+-1
+3
+0
+3
+true
+true
+false
+true
+false
+true
+true
+a+b+c
+bb
+abc
+ac
+abab
+-- stderr --
+-- exit 0 --

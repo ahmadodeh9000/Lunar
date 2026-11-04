@@ -32,6 +32,7 @@ typedef struct {
 
     Table   builtins;   // natives, copied into every module's globals
     Table   modules;    // canonical path -> ObjModule, the import cache
+    Table   builtin_modules;    // name -> ObjMap, for import("string") and the like
     struct ObjModule* main_module;   // the script being run, or the REPL
     char*   main_dir;   // its directory; module names are shown relative to it
     Table   strings;    // interned strings
@@ -79,5 +80,10 @@ Value pop();
 void runtime_error(const char* fmt, ...);
 
 void define_native(const char* name, NativeFn fn);
+// adds a native to a built-in module's map, which the caller keeps reachable
+void define_module_native(ObjMap* map, const char* name, NativeFn fn);
+
+// bytes in the UTF-8 character at s; a malformed one counts as a single byte
+int utf8_char_length(const char* s, int remaining);
 
 #endif

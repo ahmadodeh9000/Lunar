@@ -1,0 +1,8 @@
+// Unknown built-in modules are catchable errors, and don't break later imports.
+try { import("strng"); } catch (e) { print e; }
+try { import(""); } catch (e) { print e; }
+try { import("String"); } catch (e) { print e; }
+// a name with a NUL byte in it isn't "string"
+try { import("string" + import("string").from_byte(0)); print "no error"; } catch (e) { print "caught"; }
+print import("string").lower("STILL WORKS");
+import("nope");

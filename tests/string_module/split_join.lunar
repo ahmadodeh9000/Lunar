@@ -1,0 +1,13 @@
+let s = import("string");
+print s.split("a,b,c", ",");
+print s.split("a,,b,", ",");
+print len(s.split("", ","));
+print s.split("one", ",");
+print s.split("a::b::c", "::");
+print s.split("héllo wörld", "");        // "" splits into UTF-8 characters
+print len(s.split("", ""));
+print s.join(["a", "b", "c"], ", ");
+print s.join([], ",") == "";
+print s.join(["solo"], "-");
+print s.join(["x", "", "y"], "");
+print s.join(s.split("1 2 3", " "), "+");

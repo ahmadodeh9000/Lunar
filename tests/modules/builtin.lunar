@@ -1,0 +1,25 @@
+// import("name") opens a built-in module once; every importer gets the same map.
+let s = import("string");
+print import("string") == s;
+print import("lib/uses_string.lunar") == s;
+
+// the cache holds up across many imports (and collections, under GC stress)
+let same = true;
+for (let i = 0; i < 1000; i = i + 1) {
+    if (import("string") != s) same = false;
+}
+print same;
+
+// natives are plain map entries: called without self, listed by keys
+print s.upper("ok");
+print has(s, "split");
+print len(s) > 0;
+
+// the map is shared and mutable: a change is seen by every importer
+s.extra = 42;
+print import("lib/uses_string.lunar").extra;
+remove(s, "extra");
+print has(import("string"), "extra");
+
+// a file named like a built-in is still imported by its path
+try { import("string.lunar"); } catch (e) { print e; }

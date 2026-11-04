@@ -1,0 +1,36 @@
+string.split() takes 2 arguments (got 1).
+string.split() expects a string for argument 2 (got number).
+string.join() expects an array for argument 1 (got string).
+string.join() expects an array of strings (got number at index 1).
+string.join() expects a string for argument 2 (got nil).
+string.find() takes 2 or 3 arguments (got 1).
+string.find() takes 2 or 3 arguments (got 4).
+string.find() expects a number for argument 3 (got string).
+string.find() expects a whole number for argument 3 (got 0.5).
+string.contains() expects a string for argument 1 (got number).
+string.starts_with() takes 2 arguments (got 1).
+string.ends_with() expects a string for argument 2 (got array).
+string.replace() takes 3 arguments (got 2).
+string.replace() can't replace an empty string.
+string.slice() takes 3 arguments (got 2).
+string.slice() expects a whole number for argument 3 (got 1.5).
+string.slice() expects a string for argument 1 (got number).
+string.upper() takes 1 argument (got 0).
+string.lower() expects a string for argument 1 (got number).
+string.trim() expects a string for argument 1 (got nil).
+string.repeat() count can't be negative (got -1).
+string.repeat() expects a whole number for argument 2 (got 2.5).
+string.repeat() result is too long.
+string.chars() expects a string for argument 1 (got number).
+string.char_count() takes 1 argument (got 0).
+string.to_number() expects a string for argument 1 (got number).
+string.byte() index 3 out of bounds (length 3).
+string.byte() index -1 out of bounds (length 3).
+string.byte() index 0 out of bounds (length 0).
+string.from_byte() expects a byte from 0 to 255 (got 256).
+string.from_byte() expects a byte from 0 to 255 (got -1).
+string.from_byte() expects a whole number for argument 1 (got 1.5).
+-- stderr --
+string.slice() takes 3 arguments (got 1).
+[line 36] in script
+-- exit 100 --

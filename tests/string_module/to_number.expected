@@ -1,0 +1,24 @@
+42
+-3.5
+7
+12
+0.25
+0.5
+5
+1000
+0.025
+7
+string.to_number() can't convert "" to a number.
+string.to_number() can't convert "   " to a number.
+string.to_number() can't convert "abc" to a number.
+string.to_number() can't convert "12abc" to a number.
+string.to_number() can't convert "1 2" to a number.
+string.to_number() can't convert "0x10" to a number.
+string.to_number() can't convert "inf" to a number.
+string.to_number() can't convert "nan" to a number.
+string.to_number() can't convert "1e" to a number.
+string.to_number() can't convert "-" to a number.
+string.to_number() can't convert "." to a number.
+string.to_number() can't convert "e5" to a number.
+-- stderr --
+-- exit 0 --

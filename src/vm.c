@@ -13,6 +13,7 @@
 #endif
 
 #include "lunar_std.h"
+#include "lunar_modules.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,6 +56,7 @@ void init_lunar_vm() {
     lvm.open_upvalues=NULL;
     init_table(&lvm.builtins);
     init_table(&lvm.modules);
+    init_table(&lvm.builtin_modules);
     init_table(&lvm.strings);
     lvm.main_module=NULL; lvm.main_dir=NULL;
     lvm.init_string=NULL;
@@ -82,6 +84,7 @@ void init_lunar_vm() {
 void free_lunar_vm() {
     free_table(&lvm.builtins);
     free_table(&lvm.modules);
+    free_table(&lvm.builtin_modules);
     free_table(&lvm.strings);
     free(lvm.main_dir); lvm.main_dir=NULL; lvm.main_module=NULL;
     lvm.init_string=NULL;
@@ -263,7 +266,7 @@ static bool add_map_pairs(ObjMap* map, Value* pairs, int n) {
 }
 
 // bytes in the UTF-8 character at s; a malformed one counts as a single byte
-static int utf8_char_length(const char* s, int remaining) {
+int utf8_char_length(const char* s, int remaining) {
     u8 c = (u8)s[0];
     int n = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : (c >> 3) == 0x1E ? 4 : 1;
     if (n > remaining) return 1;
@@ -392,10 +395,7 @@ static bool import_module(ObjModule* importer) {
     ObjString* path=AS_STRING(peek(0));
     size_t plen=(size_t)path->length;
     bool is_file=strchr(path->chars,'/')!=NULL || (plen>=6 && strcmp(path->chars+plen-6,".lunar")==0);
-    if(!is_file){       // room for built-in modules such as import("string"); none exist yet
-        runtime_error("No built-in module named '%s' (to import a file, use '%s.lunar').",path->chars,path->chars);
-        return false;
-    }
+    if(!is_file) return import_builtin(path);
 
     // relative to the importing file's directory (the current one for the REPL)
     char cwd[PATH_MAX];

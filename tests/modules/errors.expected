@@ -8,7 +8,7 @@ throws.lunar running
 module failed
 Can't compile module 'lib/bad_syntax.lunar'.
 Can't read module 'lib/sub/'.
-No built-in module named 'string' (to import a file, use 'string.lunar').
+No built-in module named 'strng' (to import a file, use 'strng.lunar').
 No built-in module named 'utils' (to import a file, use 'utils.lunar').
 import() expects a string path (got number).
 import() expects a string path (got nil).

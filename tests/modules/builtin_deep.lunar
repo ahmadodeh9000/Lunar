@@ -1,0 +1,19 @@
+// The first import of a built-in module happens deep in the call stack, with
+// locals below it. Opening the module must not touch any of them.
+fn dive(n, a, b) {
+    let local = "local " + str(n);
+    if (n == 0) {
+        let s = import("string");
+        print s.join(["bottom", a, b], " ");
+        print local;
+        ret s;
+    }
+    let s = dive(n - 1, a, b);
+    if (local != "local " + str(n)) print "local " + str(n) + " was overwritten";
+    ret s;
+}
+let before = "kept";
+let s = dive(55, "x", "y");
+print before;
+print s == import("string");
+print s.repeat("ok", 2);

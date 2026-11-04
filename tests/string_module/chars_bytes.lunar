@@ -1,0 +1,24 @@
+// len and indexes count bytes; chars and char_count walk UTF-8 characters.
+let s = import("string");
+let word = "naïve 🚀";
+print len(word);
+print s.char_count(word);
+print s.chars(word);
+print len(s.chars(""));
+// chars agrees with for-in
+let n = 0;
+for (c in word) { n = n + 1; }
+print n == s.char_count(word);
+print s.byte("A", 0);
+print s.byte("é", 0);
+print s.byte("é", 1);
+print s.from_byte(72) + s.from_byte(105);
+print len(s.from_byte(0));
+// a malformed byte is its own one-byte character
+let bad = s.from_byte(255) + "a";
+print s.char_count(bad);
+print len(s.chars(bad)[0]);
+// bytes round-trip
+let out = "";
+for (let i = 0; i < len(word); i = i + 1) { out = out + s.from_byte(s.byte(word, i)); }
+print out == word;

@@ -10,7 +10,7 @@ try_import("lib/throws.lunar");
 try_import("lib/throws.lunar");          // not cached after failing: it runs again
 try_import("lib/bad_syntax.lunar");
 try_import("lib/sub/");
-try_import("string");
+try_import("strng");
 try_import("utils");
 try { import(5); } catch (e) { print e; }
 try { import(nil); } catch (e) { print e; }

@@ -1,0 +1,2 @@
+// a file module that imports a built-in one and hands it back
+ret import("string");

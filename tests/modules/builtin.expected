@@ -1,0 +1,11 @@
+true
+true
+true
+OK
+true
+true
+42
+false
+Can't find module 'string.lunar' (looked for <root>/tests/modules/string.lunar).
+-- stderr --
+-- exit 0 --

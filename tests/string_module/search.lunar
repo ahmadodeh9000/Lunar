@@ -1,0 +1,23 @@
+let s = import("string");
+print s.find("hello world", "o");
+print s.find("hello world", "o", 5);
+print s.find("hello world", "o", 8);
+print s.find("hello", "xyz");
+print s.find("hello", "");
+print s.find("hello", "", 5);
+print s.find("hello", "", 6);
+print s.find("hello", "l", -2);         // a negative start counts from the end
+print s.find("hello", "h", -100);
+print s.find("añb", "b");               // byte index: ñ is 2 bytes
+print s.contains("hello", "ell");
+print s.contains("hello", "");
+print s.contains("", "a");
+print s.starts_with("hello", "he");
+print s.starts_with("he", "hello");
+print s.ends_with("hello", "llo");
+print s.ends_with("hello", "");
+print s.replace("a-b-c", "-", "+");
+print s.replace("aaaa", "aa", "b");
+print s.replace("abc", "x", "y");
+print s.replace("abc", "b", "");
+print s.replace("ab", "ab", "abab");

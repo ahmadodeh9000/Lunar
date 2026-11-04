@@ -1,0 +1,9 @@
+No built-in module named 'strng' (to import a file, use 'strng.lunar').
+No built-in module named '' (to import a file, use '.lunar').
+No built-in module named 'String' (to import a file, use 'String.lunar').
+caught
+still works
+-- stderr --
+No built-in module named 'nope' (to import a file, use 'nope.lunar').
+[line 8] in script
+-- exit 100 --

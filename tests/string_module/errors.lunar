@@ -1,0 +1,36 @@
+// Wrong argument counts and types throw catchable errors with the qualified name.
+let s = import("string");
+try { s.split("a"); print "no error"; } catch (e) { print e; }
+try { s.split("a", 1); print "no error"; } catch (e) { print e; }
+try { s.join("abc", ","); print "no error"; } catch (e) { print e; }
+try { s.join(["a", 2], ","); print "no error"; } catch (e) { print e; }
+try { s.join(["a"], nil); print "no error"; } catch (e) { print e; }
+try { s.find("abc"); print "no error"; } catch (e) { print e; }
+try { s.find("abc", "b", 1, 2); print "no error"; } catch (e) { print e; }
+try { s.find("abc", "b", "1"); print "no error"; } catch (e) { print e; }
+try { s.find("abc", "b", 0.5); print "no error"; } catch (e) { print e; }
+try { s.contains(1, "a"); print "no error"; } catch (e) { print e; }
+try { s.starts_with("a"); print "no error"; } catch (e) { print e; }
+try { s.ends_with("a", []); print "no error"; } catch (e) { print e; }
+try { s.replace("a", "a"); print "no error"; } catch (e) { print e; }
+try { s.replace("abc", "", "x"); print "no error"; } catch (e) { print e; }
+try { s.slice("abc", 1); print "no error"; } catch (e) { print e; }
+try { s.slice("abc", 0, 1.5); print "no error"; } catch (e) { print e; }
+try { s.slice(5, 0, 1); print "no error"; } catch (e) { print e; }
+try { s.upper(); print "no error"; } catch (e) { print e; }
+try { s.lower(1); print "no error"; } catch (e) { print e; }
+try { s.trim(nil); print "no error"; } catch (e) { print e; }
+try { s.repeat("a", -1); print "no error"; } catch (e) { print e; }
+try { s.repeat("a", 2.5); print "no error"; } catch (e) { print e; }
+try { s.repeat("ab", 2000000000); print "no error"; } catch (e) { print e; }
+try { s.chars(1); print "no error"; } catch (e) { print e; }
+try { s.char_count(); print "no error"; } catch (e) { print e; }
+try { s.to_number(5); print "no error"; } catch (e) { print e; }
+try { s.byte("abc", 3); print "no error"; } catch (e) { print e; }
+try { s.byte("abc", -1); print "no error"; } catch (e) { print e; }
+try { s.byte("", 0); print "no error"; } catch (e) { print e; }
+try { s.from_byte(256); print "no error"; } catch (e) { print e; }
+try { s.from_byte(-1); print "no error"; } catch (e) { print e; }
+try { s.from_byte(1.5); print "no error"; } catch (e) { print e; }
+// an uncaught one reports the line and exits
+s.slice("abc");

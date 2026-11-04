@@ -108,6 +108,7 @@ static void mark_roots() {
     // built-ins, and every module (each holds its own globals)
     mark_table(&lvm.builtins);
     mark_table(&lvm.modules);
+    mark_table(&lvm.builtin_modules);
     mark_object((Obj*)lvm.main_module);
 
     // compiler roots
