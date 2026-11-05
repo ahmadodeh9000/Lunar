@@ -23,6 +23,9 @@ int main(int argc, char** argv) {
 }
 
 static void repl() {
+    
+    // printing Lunar's author and version
+    printf("Lunar %s\nBy Ahmad Odeh\n\n",LUNAR_VERSION);
     char line[1024];
     for (;;) {
         printf("> ");
