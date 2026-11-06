@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE     // strdup, opendir, stat under -std=c11 with glibc
 // import("fs"): files and directories. Relative paths start from the current
 // directory (not the script's, unlike import). Files are read and written as raw
 // bytes. A failure raises an error with the OS reason.

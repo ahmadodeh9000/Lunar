@@ -1,5 +1,6 @@
 CC      ?= gcc
-CFLAGS  = -std=c11 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
+CFLAGS  = -std=c11 -Wall -Wextra -Wno-unused-parameter -Wno-unused-function \
+          -Werror=implicit-function-declaration
 TARGET_BASE := lunar
 
 # --- Platform detection -------------------------------------------------
