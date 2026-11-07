@@ -10,8 +10,8 @@ wall-clock time, including process startup. The tables are printed, not
 written anywhere.
 
 Usage (from the repo root, after `make`):
-    python3 bench/readme.py
-    python3 bench/readme.py --no-history --only fib_32 nbody_100k
+    python3 bench/langs.py
+    python3 bench/langs.py --no-history --only fib_32 nbody_100k
 """
 
 import argparse
