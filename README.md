@@ -69,6 +69,7 @@ d.speak();
 git clone https://github.com/ahmadodeh9000/Lunar
 cd Lunar
 make
+make test    # optional: runs the test suite on the release, ASan, and GC-stress builds
 ```
 
 ### Build with SDL2
