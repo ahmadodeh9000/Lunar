@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 """
-The README's benchmark tables: Lunar against Lua 5.4 and Python 3, and Lunar
-over time (the first five benchmarks on older versions, each built from git).
+Benchmark tables: Lunar against Lua 5.4 and Python 3, and Lunar over time
+(the first five benchmarks on older versions, each built from git).
 
 Each benchmark is a bench/<name>.lunar file with .lua and .py versions that
 compute the same thing; their outputs are checked against each other. Every
 program runs once to warm up, then 5 times; times are mean ± stddev of the
-wall-clock time, including process startup. With --update-readme the tables
-replace the text between these markers in README.md:
-
-    <!-- BENCH:START -->
-    <!-- BENCH:END -->
+wall-clock time, including process startup. The tables are printed, not
+written anywhere.
 
 Usage (from the repo root, after `make`):
     python3 bench/readme.py
-    python3 bench/readme.py --update-readme
     python3 bench/readme.py --no-history --only fib_32 nbody_100k
 """
 
@@ -30,7 +26,6 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BENCH = os.path.join(ROOT, "bench")
-START, END = "<!-- BENCH:START -->", "<!-- BENCH:END -->"
 
 # (label, file name); the first five are the original set, used for history
 PROGRAMS = [
@@ -118,7 +113,6 @@ def main():
     ap.add_argument("--runs", type=int, default=5)
     ap.add_argument("--only", nargs="*", help="file names, e.g. fib_32 nbody_100k")
     ap.add_argument("--no-history", action="store_true", help="skip the Lunar-over-time table")
-    ap.add_argument("--update-readme", action="store_true")
     args = ap.parse_args()
 
     lua = shutil.which("lua5.4") or shutil.which("lua")
@@ -162,18 +156,7 @@ def main():
         parts.append("**Lunar over time** (the first five benchmarks; each version built from git with `make`):")
         parts.append(table(["Benchmark"] + [v for v, _ in builds], hist))
 
-    parts.append("Reproduce: `python3 bench/readme.py --update-readme`")
-    block = "\n\n".join(parts)
-    print(block)
-
-    if args.update_readme:
-        path = os.path.join(ROOT, "README.md")
-        with open(path) as f:
-            text = f.read()
-        a, b = text.index(START) + len(START), text.index(END)
-        with open(path, "w") as f:
-            f.write(text[:a] + "\n" + block + "\n" + text[b:])
-        print(f"\nupdated {path}", file=sys.stderr)
+    print("\n\n".join(parts))
 
 
 if __name__ == "__main__":

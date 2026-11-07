@@ -7,16 +7,12 @@ matmul (nested arrays), binary trees (allocation / GC).
 Languages: Lunar, Wren, Ruby, Node.js, Lua, Python (missing ones are skipped).
 
 Prints two markdown tables: absolute times, and time relative to Lunar
-(< 1.00x means faster than Lunar). With --update-readme it writes both
-between these markers in README.md:
-
-    <!-- BENCH2:START -->
-    <!-- BENCH2:END -->
+(< 1.00x means faster than Lunar).
 
 Usage (from the repo root):
-    python3 bench2.py
-    python3 bench2.py --runs 7 --update-readme
-    python3 bench2.py --only tak sieve --langs Lunar Lua Node
+    python3 bench.py
+    python3 bench.py --runs 7
+    python3 bench.py --only tak sieve --langs Lunar Lua Node
 """
 
 import argparse
@@ -591,7 +587,6 @@ EXT = {"Lunar": "lunar", "Wren": "wren", "Ruby": "rb",
        "Node": "js", "Lua": "lua", "Python": "py"}
 VERSION_FLAG = {"Wren": ["--version"], "Ruby": ["-v"], "Node": ["-v"],
                 "Lua": ["-v"], "Python": ["--version"]}
-START, END = "<!-- BENCH2:START -->", "<!-- BENCH2:END -->"
 
 
 # --------------------------------------------------------------------------
@@ -712,19 +707,6 @@ def build_tables(names, results, langs):
     return table(header, abs_rows), table(header, rel_rows)
 
 
-def update_readme(path, block):
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    if START in text and END in text:
-        new = re.sub(re.escape(START) + r".*?" + re.escape(END),
-                     lambda _: block, text, flags=re.S)
-    else:
-        new = text.rstrip() + "\n\n## Benchmarks (cross-language)\n\n" + block + "\n"
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(new)
-    print(f"\nUpdated {path}")
-
-
 def main():
     ap = argparse.ArgumentParser(description="Benchmark Lunar vs Wren/Ruby/Node/Lua/Python")
     ap.add_argument("--lunar", default="./lunar", help="path to lunar binary")
@@ -734,8 +716,6 @@ def main():
     ap.add_argument("--only", nargs="*", help="substrings of benchmark names")
     ap.add_argument("--langs", nargs="*", help="restrict to these languages")
     ap.add_argument("--dir", default="bench2", help="where to write the programs")
-    ap.add_argument("--readme", default="README.md")
-    ap.add_argument("--update-readme", action="store_true")
     args = ap.parse_args()
 
     if not os.path.exists(args.lunar):
@@ -810,17 +790,10 @@ def main():
         "",
         "Versions: " + ", ".join(versions) + ".",
         "",
-        "Reproduce: `python3 bench2.py`",
+        "Reproduce: `python3 bench.py`",
     ]
-    block = (f"{START}\n**Absolute time**\n\n{abs_table}\n\n"
-             f"**Relative to Lunar** (below 1.00x = faster than Lunar)\n\n"
-             f"{rel_table}\n\n" + "\n".join(info) + f"\n{END}")
-
     print("\n" + abs_table + "\n\n" + rel_table + "\n")
     print("\n".join(info))
-
-    if args.update_readme:
-        update_readme(args.readme, block)
 
 
 if __name__ == "__main__":
