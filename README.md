@@ -5,6 +5,18 @@ Influenced by Lua and JavaScript. Built following [Crafting Interpreters](https:
 
 Performance: a bytecode VM in the same league as Lua for typical scripts; fast enough to run a 3D voxel game at 60 FPS ([examples/minecraft](examples/minecraft)).
 
+![LunarCraft, a voxel game written in Lunar, running at 60 FPS](docs/lunarcraft.gif)
+
+*LunarCraft ([examples/minecraft](examples/minecraft)): world, physics, and block editing are all Lunar code.*
+
+```lunar
+let scores = { ana: 12, ben: 9, cy: 15 };
+for (name, score in scores) {
+    print "{name} scored {score}";
+}
+print "players: {len(scores)}";
+```
+
 ```lunar
 struct Animal {
     init(name) { self.name = name; }
